@@ -13,6 +13,22 @@ kb <- read.csv("kb_covars.csv")
 
 ########################################################
 
+
+# Find the index of the last instance of each person
+last_instance_index <- tapply(seq_len(nrow(kb)), kb$id, tail, n = 1)
+print(last_instance_index)
+#initialize column
+kb$Event <- 0
+
+# Create the Event column
+kb$Event[last_instance_index] <- ifelse(kb$censor[last_instance_index] == 0,1,0)
+
+
+View(kb)
+
+
+kb2<-kb
+
 ################Data manipulation#######################
 
 id_df <- aggregate( censor ~ id, data = kb, FUN = max)
