@@ -19,12 +19,17 @@ G2G_varying_LL <- function(par,data_df) {
   #                       time, duration observed for each subject
   #                       status, 0 if the event has not yet occurred, 1 if the event occurs
   #                       name_not_sure, the covariates matrix, 
+  #par[1] = mean of BG
+  #par[2] = polarization of BG
+  #r=par[1]*(1/par[2]-1); 
+  #alpha=(1-par[1])*(1/par[2]-1);
   
-  r=par[1];
-  alpha=par[2];
+  r = par[1];
+  alpha = par[2];
   coeff=par[-(1:2)];
   
-  X = scale(as.matrix(data_df[,-(1:3)]));
+  #X = scale(as.matrix(data_df[,-(1:3)]));
+  X = as.matrix(data_df[,-(1:3)]);
   
   #print(length(coeff)==dim(X)[2])
   
@@ -33,6 +38,8 @@ G2G_varying_LL <- function(par,data_df) {
   data_df$cumsumCt <- ave(data_df$Ct, data_df$id, FUN = cumsum);
   
   #gather unique id information
+  
+#  print(names(data_df))
   
   id_df <- aggregate(cbind(time, status) ~ id, data = data_df, FUN = max)
   
@@ -107,33 +114,32 @@ G2G_varying_MLE <- function(fo, data, subject) {
   #id: a text field for the subject
   
   #the dependent variables: time and status
-  time = all.vars(as.formula(fo))[1];
-  status = all.vars(as.formula(fo))[2];
+  time_name = all.vars(as.formula(fo))[1];
+  status_name = all.vars(as.formula(fo))[2];
   
   df_temp<-data[,c(all.vars(as.formula(fo))[-c(1:2)])];
   
   X<-model.matrix( ~ ., data = df_temp);
   
-  model_data<-data.frame(id=data[,c(subject)], 
-                         time = data[,c(time)],
-                         status = data[,c(status)],
+  model_data<-data.frame(id = unlist(data[,c(subject)]), 
+                         time = unlist(data[,c(time_name)]),
+                         status = unlist(data[,c(status_name)]),
                          X=X[,-1]);
-  
-  
+  #print(head(model_data))
   return( G2G_varying_optim(model_data) ); 
-  
+   
 }
 
-G2G_varying_optim <- function(data_df) {
+G2G_varying_optim <- function(model_data) {
   
-  nvar=dim(data_df)[2]-1;
+  nvar=dim(model_data)[2]-1;
   
-  solution=optim(par=c(0.05,.05,rep(0,nvar-2)),
+  solution=optim(par=c(0.5,.05,rep(0,nvar-2)),
                  fn=G2G_varying_LL,
-                 data = data_df,
+                 data_df = model_data,
                  method="L-BFGS-B",
-                 lower=c(1e-3,1e-3,rep(-5,nvar-2)), 
-                 upper=c(100,100,rep(5,nvar-2)),
+                 lower=c(.001,.001,rep(-5,nvar-2)), 
+                 upper=c(Inf,Inf,rep(5,nvar-2)),
                  control = list(maxit=1000),
                  hessian = TRUE);
   solution$par_stderr<-sqrt(diag(solve(solution$hessian)))
