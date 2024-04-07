@@ -81,8 +81,7 @@ Then after ensuring the data is prepared correctly, you just need to run this co
 G2G_varying_MLE(Surv(exit,event) ~ sex + immigrant + foodprices, data=Scania_PersonPeriod_Train, subject="id") 
 ```
 
-The left-hand-side of formula follows the standard R convention for survival analysis, ```Surv(period, occur)```.  Remember that the second variable ```occur``` should be 0 unless the event of interest _occurs_ at that period, which then takes the value of 1.  The right-hand-side of the formula consists of the time-varying and also time-invarying covariates. The ```data=``` indicates the data frame.  Finally, the ```subject=``` indicates the column representing the _person_, and note that it should be a string.   
-
+The left-hand-side of formula follows the standard R convention for survival analysis, ```Surv(period, occur)```.  Remember that the second variable ```occur``` should be 0 unless the event of interest _occurs_ at that period, which then takes the value of 1.  The right-hand-side of the formula consists of the time-varying and also time-invarying covariates. The ```data=``` indicates the data frame.  Finally, the ```subject=``` indicates the column representing the _person_, and note that it should be a string.  You should also standardize or at least downscale your covariates to avoid numerical overflow issue.
 
 Please contact me (kaloklee@gmail.com) if you have any questions or comments.
 
