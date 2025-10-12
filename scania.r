@@ -37,7 +37,7 @@ Scania_PersonPeriod_Train <- dataLong(dataShort = Scania_Person_Train,
 
 head(Scania_PersonPeriod_Train, 50)
 names(Scania_PersonPeriod_Train)
-source("~/R/G2G/G2G_background_functions _al.r")
+source("~/R/G2G/G2G_background_functions.r")
 ptm <- proc.time()
 abc<-G2G_covariate_MLE(Surv(exit,event) ~ sex + immigrant + foodprices, data=Scania_PersonPeriod_Train, subject="id") 
 proc.time() - ptm
