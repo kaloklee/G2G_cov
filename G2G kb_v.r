@@ -73,19 +73,3 @@ solution$par_lower<-solution$par-1.96*solution$par_stderr
 solution$par
 solution$par_upper
 solution$par_lower
-
-
-logsumexp <- function(l) { 
-  n <- length(l)
-  L <- sort(l, decreasing = TRUE)
-  S <- rep(L[1], n)
-  if (n > 1) {
-    for (k in 1:(n-1)) {
-      S[k+1] <- max(L[k+1], S[k]) + log1p(exp(-abs(L[k+1] - S[k]))) } }
-  return (S[n]) 
-}
-
-logsumexp(c(1,2,3))
-
-log(exp(1)+exp(2)+exp(3))
-
