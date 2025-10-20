@@ -1,0 +1,26 @@
+Package: G2Gcov
+Type: Package
+Title: Grassia(II)-Geometric Distribution with Time-Varying Covariates
+Version: 0.1.0
+Date: 2025-10-17
+Authors@R: c(
+    person("Ka", "Lee", 
+           email = "kaloklee@gmail.com", 
+           role = c("aut", "ctb"),
+    person("Aaron", "Ramsey", 
+           email = "aarondaelramsey@gmail.com", 
+           role = c("aut", "cre")),
+    person("Noah", "Park", 
+           email = "noahpark@wharton.upenn.edu", 
+           role = "aut", "ctb")
+    )
+Description: Implements G2G+covariates model 
+License: Apache License (>= 2)
+Encoding: UTF-8
+LazyData: true
+Depends: R (>= 3.5.0)
+RoxygenNote: 7.2.3
+VignetteBuilder: knitr
+Suggests: 
+    knitr,
+    rmarkdown
