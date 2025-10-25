@@ -7,3 +7,9 @@
 inst/doc
 /doc/
 /Meta/
+.Rapp.history
+Rplots.pdf
+*.png
+*.jpg
+*.jpeg
+*.pdf
