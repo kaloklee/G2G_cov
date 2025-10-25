@@ -37,9 +37,9 @@ logdiffexp <- function (a,b) {
 #model likelihood function
 G2G_static_MLE <- function(par,df) {
   #par: parameters
-
-  r=par[1];
-  alpha=par[2];
+  
+  r=exp(par[1]);
+  alpha=exp(par[2]);
   beta=par[-c(1:2)];
   
   #y: duration for each person 
@@ -48,13 +48,13 @@ G2G_static_MLE <- function(par,df) {
   y = df[,1];
   status = df[,2];
   X = as.matrix(df[, -c(1:2)]);
-
+  
   #uncensored piece of likelihood 
   uncen=y[which(status==1)];
   C_u = exp(X[which(status==1),] %*% beta); # exp(X*b) -> Perhaps there is a trick to downscale X here (so the user does not)
   LL_uncen=logdiffexp( -r*log(1+C_u*(uncen-1)/alpha), 
                        -r*log(1+C_u*(uncen)/alpha) );
-
+  
   #censored piece of likelihood  
   cen=y[which(status==0)];
   C_c = exp(X[which(status==0),] %*% beta); # exp(X*b) -> investigate ways to downscale to avoid numercial error
@@ -69,17 +69,25 @@ G2G_static_MLE <- function(par,df) {
 
 #we use the standard 'optim' routine for estimation
 
-solution=optim(par=c(0.5,0.5,rep(0,dim(data_df)[2]-2)),
+solution=optim(par=c(log(0.5),log(0.5),rep(0,dim(data_df)[2]-2)),
                fn=G2G_static_MLE,
                df = data_df,
-               method="L-BFGS-B",
-               lower=c(1e-5,1e-5,-Inf,-Inf), upper=c(Inf,Inf,Inf,Inf),
+               method="BFGS",
                hessian = TRUE)
+
 
 #standard error and 95% CI
 solution$par_stderr<-sqrt(diag(solve(solution$hessian)))
 solution$par_upper<-solution$par+1.96*solution$par_stderr
 solution$par_lower<-solution$par-1.96*solution$par_stderr
+
+# Indices of parameters that are on log scale
+exp_idx <- 1:2  # always first two
+
+# Exponentiate only the relevant intervals and estimates
+solution$par[exp_idx]        <- exp(solution$par[exp_idx])
+solution$par_upper[exp_idx]  <- exp(solution$par_upper[exp_idx])
+solution$par_lower[exp_idx]  <- exp(solution$par_lower[exp_idx])
 
 #Show the estimated parameters are within the 95% CI
 solution$par
