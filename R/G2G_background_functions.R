@@ -2,16 +2,60 @@
 
 
 #Create a logdiffexp function to avoid computation error
-logdiffexp <- function (a,b) {
-  
-  c = pmax(a,b);
-  return (c + log(exp(a-c)-exp(b-c))) ;
-  
+# Numerically stable calculation of log(1 - exp(x))
+# Following the algorithm of Mächler 2012
+# Mächler 2012: https://cran.r-project.org/web/packages/Rmpfr/vignettes/log1mexp-note.pdf
+# Returns -Inf when x == 0 and NaN when x > 0
+log1mexp <- function(x) {
+  ifelse(
+    x > -0.6931472,  # approx log(2)
+    log(-expm1(x)),
+    log1p(-exp(x))
+  )
 }
 
+# Numerically stable calculation of log(exp(a) - exp(b))
+# Again following the algorithm of Mächler 2012
+# Returns -Inf when a == b (including a == b == -Inf, since log(0) = -Inf)
+# Returns NaN when a < b or a == Inf
+logdiffexp <- function(a, b) {
+  ifelse(
+    (a < Inf) & (a > b),
+    a + log1mexp(b - a),
+    ifelse((a < Inf) & (a == b), -Inf, NaN)
+  )
+}
 
+#model log-likelihood functions
 
-#model log-likelihood function
+G2G_static_LL <- function(par,df) {
+  #par: parameters
+  
+  r=exp(par[1]);
+  alpha=exp(par[2]);
+  beta=par[-c(1:2)];
+  
+  #y: duration for each person 
+  #status: status
+  #X: all the covariates in a matrix format
+  y = df[,1];
+  status = df[,2];
+  X = as.matrix(df[, -c(1:2)]);
+  
+  #uncensored piece of likelihood 
+  uncen=y[which(status==1)];
+  C_u = exp(X[which(status==1),] %*% beta); # exp(X*b) -> Perhaps there is a trick to downscale X here (so the user does not)
+  LL_uncen=logdiffexp( -r*log(1+C_u*(uncen-1)/alpha), 
+                       -r*log(1+C_u*(uncen)/alpha) );
+  
+  #censored piece of likelihood  
+  cen=y[which(status==0)];
+  C_c = exp(X[which(status==0),] %*% beta); # exp(X*b) -> investigate ways to downscale to avoid numercial error
+  LL_cen = -r*log(1+C_c*(cen)/alpha);
+  
+  return (-sum(LL_uncen)-sum(LL_cen));
+}
+
 G2G_varying_LL <- function(par,data_df) {
   #par: parameters
   #data_df: a data.frame with these columns:
@@ -24,8 +68,8 @@ G2G_varying_LL <- function(par,data_df) {
   #r=par[1]*(1/par[2]-1); 
   #alpha=(1-par[1])*(1/par[2]-1);
   
-  r = par[1];
-  alpha = par[2];
+  r = exp(par[1]);
+  alpha = exp(par[2]);
   coeff=par[-(1:2)];
   
   #X = scale(as.matrix(data_df[,-(1:3)]));
