@@ -1,31 +1,27 @@
-#################Background functions#################
-
-
-#Create a logdiffexp function to avoid computation error
-logdiffexp <- function (a,b) {
-  
-  c = pmax(a,b);
-  return (c + log(exp(a-c)-exp(b-c))) ;
-  
-}
-
-
-
-#model log-likelihood function
+#' Log-Likelihood for G2G Model with Time-Varying Covariates
+#'
+#' Internal function that computes the negative log-likelihood for the G2G model
+#' with time-varying covariates. Used by the optimization routine.
+#'
+#' @param par Numeric vector of parameters. First two elements are r and alpha
+#'   (shape and rate parameters), remaining elements are covariate coefficients.
+#' @param data_df Data frame with columns:
+#'   \describe{
+#'     \item{id}{Subject identifier}
+#'     \item{time}{Time point for each observation}
+#'     \item{status}{Event indicator (0 = no occurence, 1 = event occurred)}
+#'     \item{...}{Time-varying covariates (remaining columns)}
+#'   }
+#' @return Scalar value of the negative log-likelihood
+#' @keywords internal
 G2G_varying_LL <- function(par,data_df) {
-  #par: parameters
-  #data_df: a data.frame with these columns:
-  #                       id, id of each subject
-  #                       time, duration observed for each subject
-  #                       status, 0 if the event has not yet occurred, 1 if the event occurs
-  #                       name_not_sure, the covariates matrix, 
   #par[1] = mean of BG
   #par[2] = polarization of BG
   #r=par[1]*(1/par[2]-1); 
   #alpha=(1-par[1])*(1/par[2]-1);
   
-  r = par[1];
-  alpha = par[2];
+  r = exp(par[1]);
+  alpha = exp(par[2]);
   coeff=par[-(1:2)];
   
   #X = scale(as.matrix(data_df[,-(1:3)]));
@@ -102,11 +98,61 @@ G2G_varying_LL <- function(par,data_df) {
   
 }
 
-
-#########Command to run MLE########################
-
-#### Data preparation
-
+#' Fit G2G Model with Time-Varying Covariates
+#'
+#' Fits a Grassia(II)-Gamma (G2G) survival model with time-varying covariates using
+#' maximum likelihood estimation.
+#'
+#' @param fo Formula object specifying the model in the format 
+#'   \code{Surv(time, status) ~ x1 + x2 + ...} where time is the observation
+#'   time, status is the event indicator, and x1, x2, etc. are time-varying
+#'   covariates. Note: The formula should use variable names, not column indices.
+#' @param data Data frame containing all variables specified in the formula.
+#'   Data should be in long format with one row per time point per subject 
+#'   (i.e. period-person format)
+#' @param subject Character string specifying the name of the subject ID column
+#'   in the data frame. This column identifies which observations belong to
+#'   the same subject over time.
+#'
+#' @return A list containing the optimization results from \code{\link[stats]{optim}}
+#'   with additional elements:
+#'   \item{par}{Parameter estimates. First two are r and alpha (shape and rate
+#'     parameters), remaining are covariate coefficients.}
+#'   \item{par_stderr}{Standard errors of parameter estimates}
+#'   \item{par_upper}{Upper bounds of 95\% confidence intervals}
+#'   \item{par_lower}{Lower bounds of 95\% confidence intervals}
+#'   \item{value}{Negative log-likelihood at the optimum}
+#'   \item{convergence}{Convergence code (0 indicates successful convergence)}
+#'   \item{hessian}{Hessian matrix at the optimum}
+#'
+#' @export
+#' @importFrom stats aggregate optim as.formula ave model.matrix
+#'
+#' @examples
+#' \dontrun{
+#' # Example with longitudinal data
+#' # Assume 'longdata' has columns: id, time, status, covariate1, covariate2
+#' 
+#' fit <- G2G_varying_MLE(
+#'   fo = Surv(time, status) ~ covariate1 + covariate2,
+#'   data = longdata,
+#'   subject = "id"
+#' )
+#' 
+#' # View parameter estimates
+#' fit$par
+#' 
+#' # View confidence intervals
+#' cbind(
+#'   Parameter = c("r", "alpha", "covar1", "covar2"),
+#'   Lower = fit$par_lower,
+#'   Estimate = fit$par,
+#'   Upper = fit$par_upper
+#' )
+#' 
+#' # Check convergence
+#' fit$convergence  # Should be 0
+#' }
 G2G_varying_MLE <- function(fo, data, subject) {
   
   #fo: the formula in this format: Surv(A,B)
@@ -130,6 +176,20 @@ G2G_varying_MLE <- function(fo, data, subject) {
    
 }
 
+#' Internal Optimization for Time-Varying Model
+#'
+#' Internal wrapper function that performs the actual optimization for the
+#' G2G model with time-varying covariates using L-BFGS-B method.
+#'
+#' @param model_data Data frame prepared by \code{G2G_varying_MLE} containing
+#'   id, time, status, and covariate columns
+#' @return List containing optimization results from \code{\link[stats]{optim}}
+#'   with additional elements for standard errors and confidence intervals:
+#'   \item{par}{Parameter estimates}
+#'   \item{par_stderr}{Standard errors}
+#'   \item{par_upper}{Upper bounds of 95\% confidence intervals}
+#'   \item{par_lower}{Lower bounds of 95\% confidence intervals}
+#' @keywords internal
 G2G_varying_optim <- function(model_data) {
   
   nvar=dim(model_data)[2]-1;
@@ -137,9 +197,7 @@ G2G_varying_optim <- function(model_data) {
   solution=optim(par=c(0.5,.05,rep(0,nvar-2)),
                  fn=G2G_varying_LL,
                  data_df = model_data,
-                 method="L-BFGS-B",
-                 lower=c(.001,.001,rep(-5,nvar-2)), 
-                 upper=c(Inf,Inf,rep(5,nvar-2)),
+                 method="BFGS",
                  control = list(maxit=1000),
                  hessian = TRUE);
   solution$par_stderr<-sqrt(diag(solve(solution$hessian)))

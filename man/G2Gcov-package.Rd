@@ -6,7 +6,7 @@
 \alias{G2Gcov-package}
 \title{G2Gcov: Grassia(II)-Geometric Distribution with Time-Varying Covariates}
 \description{
-Implements G2G+covariates model
+Implements the Grassia(II)-Geometric (G2G) distribution model with time-varying covariates for discrete-time survival analysis. Provides maximum likelihood estimation following Fader and Hardie's methodology for incorporating covariates in discrete-time duration models. Supports both static and time-varying covariates using person-period formatted data.
 }
 \author{
 \strong{Maintainer}: Aaron Ramsey \email{aarondaelramsey@gmail.com}
