@@ -128,31 +128,6 @@ G2G_varying_LL <- function(par,data_df) {
 #' @export
 #' @importFrom stats aggregate optim as.formula ave model.matrix
 #'
-#' @examples
-#' \dontrun{
-#' # Example with longitudinal data
-#' # Assume 'longdata' has columns: id, time, status, covariate1, covariate2
-#' 
-#' fit <- G2G_varying_MLE(
-#'   fo = Surv(time, status) ~ covariate1 + covariate2,
-#'   data = longdata,
-#'   subject = "id"
-#' )
-#' 
-#' # View parameter estimates
-#' fit$par
-#' 
-#' # View confidence intervals
-#' cbind(
-#'   Parameter = c("r", "alpha", "covar1", "covar2"),
-#'   Lower = fit$par_lower,
-#'   Estimate = fit$par,
-#'   Upper = fit$par_upper
-#' )
-#' 
-#' # Check convergence
-#' fit$convergence  # Should be 0
-#' }
 G2G_varying_MLE <- function(fo, data, subject) {
   
   #fo: the formula in this format: Surv(A,B)
@@ -163,8 +138,8 @@ G2G_varying_MLE <- function(fo, data, subject) {
   time_name = all.vars(as.formula(fo))[1];
   status_name = all.vars(as.formula(fo))[2];
   
-  df_temp<-data[,c(all.vars(as.formula(fo))[-c(1:2)])];
-  
+  #df_temp<-data[,c(all.vars(as.formula(fo))[-c(1:2)])];
+  df_temp <- data[, c(all.vars(as.formula(fo))[-c(1:2)]), drop = FALSE];
   X<-model.matrix( ~ ., data = df_temp);
   
   model_data<-data.frame(id = unlist(data[,c(subject)]), 
@@ -194,7 +169,7 @@ G2G_varying_optim <- function(model_data) {
   
   nvar=dim(model_data)[2]-1;
   
-  solution=optim(par=c(0.5,.05,rep(0,nvar-2)),
+  solution=optim(par=c(log(0.5),log(0.5),rep(0,nvar-2)),
                  fn=G2G_varying_LL,
                  data_df = model_data,
                  method="BFGS",
@@ -203,6 +178,12 @@ G2G_varying_optim <- function(model_data) {
   solution$par_stderr<-sqrt(diag(solve(solution$hessian)))
   solution$par_upper<-solution$par+1.96*solution$par_stderr
   solution$par_lower<-solution$par-1.96*solution$par_stderr
+
+  # Exponentiate first two parameters
+  exp_idx <- 1:2
+  solution$par[exp_idx] <- exp(solution$par[exp_idx])
+  solution$par_upper[exp_idx] <- exp(solution$par_upper[exp_idx])
+  solution$par_lower[exp_idx] <- exp(solution$par_lower[exp_idx])
   
   return (solution);
   

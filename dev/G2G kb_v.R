@@ -63,7 +63,7 @@ ptm <- proc.time()
 # Fit the G2G model with time-varying covariates
 # Note: Using the new function name
 test_sol <- G2G_varying_MLE(
-  fo = Surv(week, status) ~ coupon/10 + anyp/10,
+  fo = Surv(week, status) ~ coupon + anyp,
   data = kb2,
   subject = "id"
 )
@@ -99,8 +99,7 @@ results_table <- data.frame(
   Estimate = test_sol$par,
   SE = test_sol$par_stderr,
   Lower_95 = test_sol$par_lower,
-  Upper_95 = test_sol$par_upper,
-  Z_score = test_sol$par / test_sol$par_stderr
+  Upper_95 = test_sol$par_upper
 )
 print(results_table)
 

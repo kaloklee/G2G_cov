@@ -16,7 +16,7 @@ head(veteran)
 
 ## ----fit-model----------------------------------------------------------------
 # Fit G2G model with age and Karnofsky score as covariates
-fit <- G2G_static(Surv(time, status) ~ 1, data = veteran)
+fit <- G2G_static(Surv(time, status) ~ age + karno, data = veteran)
 
 # View parameter estimates
 fit$par
