@@ -36,29 +36,3 @@ A list containing the optimization results from \code{\link[stats]{optim}}
 Fits a Grassia(II)-Gamma (G2G) survival model with time-varying covariates using
 maximum likelihood estimation.
 }
-\examples{
-\dontrun{
-# Example with longitudinal data
-# Assume 'longdata' has columns: id, time, status, covariate1, covariate2
-
-fit <- G2G_varying_MLE(
-  fo = Surv(time, status) ~ covariate1 + covariate2,
-  data = longdata,
-  subject = "id"
-)
-
-# View parameter estimates
-fit$par
-
-# View confidence intervals
-cbind(
-  Parameter = c("r", "alpha", "covar1", "covar2"),
-  Lower = fit$par_lower,
-  Estimate = fit$par,
-  Upper = fit$par_upper
-)
-
-# Check convergence
-fit$convergence  # Should be 0
-}
-}

@@ -37,8 +37,8 @@ G2G_static_LL <- function(par, df) {
 #' @examples
 #' # Example with veteran dataset
 #' # library(survival)
-#' # fit <- G2G_static(Surv(time, status) ~ age + karno, data = veteran)
-G2G_static <- function(formula, data) {
+#' # fit <- G2G_static_MLE(Surv(time, status) ~ age + karno, data = veteran)
+G2G_static_MLE <- function(formula, data) {
   
   # Extract variables from formula
   mf <- model.frame(formula, data = data)
