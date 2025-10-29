@@ -14,15 +14,23 @@ Authors@R: c(
            email = "noahpark@wharton.upenn.edu",
            role = c("aut", "ctb"))
     )
-Description: Implements G2G+covariates model 
+Description: Implements the Grassia(II)-Geometric (G2G) distribution model with 
+    time-varying covariates for discrete-time survival analysis. Provides maximum 
+    likelihood estimation following Fader and Hardie's methodology for incorporating 
+    covariates in discrete-time duration models. Supports both static and 
+    time-varying covariates using person-period formatted data.
 License: Apache License (>= 2)
 Encoding: UTF-8
 LazyData: true
 Depends: R (>= 3.5.0)
 RoxygenNote: 7.3.3
 VignetteBuilder: knitr
+Imports:
+    stats
 Suggests: 
+    survival,
     knitr,
     rmarkdown,
-    testthat (>= 3.0.0)
+    testthat (>= 3.0.0),
+    tidyverse,
 Config/testthat/edition: 3
