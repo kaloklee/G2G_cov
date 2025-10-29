@@ -146,8 +146,22 @@ G2G_varying_MLE <- function(fo, data, subject) {
                          time = unlist(data[,c(time_name)]),
                          status = unlist(data[,c(status_name)]),
                          X=X[,-1]);
-  #print(head(model_data))
-  return( G2G_varying_optim(model_data) ); 
+  solution <- G2G_varying_optim(model_data)
+
+  # Construct parameter names
+  par_names <- c("r (shape)", "alpha (rate)", colnames(X[,-1]))
+
+  names(solution$par) <- par_names
+  solution$par_stderr<-sqrt(diag(solve(solution$hessian)))
+  solution$par_upper<-solution$par+1.96*solution$par_stderr
+  solution$par_lower<-solution$par-1.96*solution$par_stderr
+
+  # Exponentiate first two parameters
+  exp_idx <- 1:2
+  solution$par[exp_idx] <- exp(solution$par[exp_idx])
+  solution$par_upper[exp_idx] <- exp(solution$par_upper[exp_idx])
+  solution$par_lower[exp_idx] <- exp(solution$par_lower[exp_idx])
+  return(solution); 
    
 }
 
@@ -175,15 +189,7 @@ G2G_varying_optim <- function(model_data) {
                  method="BFGS",
                  control = list(maxit=1000),
                  hessian = TRUE);
-  solution$par_stderr<-sqrt(diag(solve(solution$hessian)))
-  solution$par_upper<-solution$par+1.96*solution$par_stderr
-  solution$par_lower<-solution$par-1.96*solution$par_stderr
 
-  # Exponentiate first two parameters
-  exp_idx <- 1:2
-  solution$par[exp_idx] <- exp(solution$par[exp_idx])
-  solution$par_upper[exp_idx] <- exp(solution$par_upper[exp_idx])
-  solution$par_lower[exp_idx] <- exp(solution$par_lower[exp_idx])
   
   return (solution);
   

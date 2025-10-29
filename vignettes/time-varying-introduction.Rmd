@@ -1,0 +1,440 @@
+---
+title: "Time-Varying Covariates with G2G Models"
+author: "Aaron Ramsey"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Time-Varying Covariates with G2G Models}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+  %\VignetteDepends{survival}
+---
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.width = 7,
+  fig.height = 5,
+  warning = FALSE,
+  message = FALSE,
+  error = FALSE
+)
+```
+
+## Overview
+
+The **G2Gcov** package provides tools for fitting Grassia(II)-Geometric (G2G) survival models with time-varying covariates. This vignette demonstrates how to:
+
+- Prepare data with time-varying covariates
+- Fit a G2G model with covariates that change over time
+- Extract and interpret parameter estimates
+- Compare models with different covariate specifications
+- Check model diagnostics
+
+## Load Required Packages
+```{r load-packages}
+library(G2Gcov)
+library(survival)
+library(dplyr)
+```
+
+## Understanding Time-Varying Covariates
+
+Time-varying covariates are variables whose values change over time for each subject. This is common in:
+
+- **Customer behavior**: Purchase patterns, coupon usage
+- **Clinical trials**: Treatment changes, biomarker levels
+- **Employment studies**: Job status, salary changes
+
+### Data Structure Requirements
+
+Time-varying covariate data requires a specific format:
+
+- Each subject has **multiple rows** (one per time interval)
+- Each row represents a time period with potentially different covariate values
+- The **last row** for each subject indicates whether an event occurred
+- A **subject identifier** variable links rows belonging to the same individual
+
+## Example Dataset: Customer Behavior Data
+
+We'll use the `kb_data` dataset included in the package, which contains customer behavior data where covariates like coupon usage and purchase patterns change weekly.
+```{r load-data}
+# Load the kb_data dataset
+data(kb_data, package = "G2Gcov")
+
+# View structure
+head(kb_data)
+str(kb_data)
+```
+
+**Key Variables:**
+
+- `id`: Customer identifier
+- `week`: Time period (week number)
+- `censor`: Censoring indicator (0 = event, 1 = censored)
+- `coupon`: Coupon usage (time-varying)
+- `anyp`: Purchase indicator (time-varying)
+
+## Data Preparation
+
+### Step 1: Create Event Indicator
+
+Identify the last observation for each subject and create an event indicator:
+```{r prepare-event}
+# Find the index of the last instance of each person
+last_instance_index <- tapply(seq_len(nrow(kb_data)), kb_data$id, tail, n = 1)
+
+# Initialize Event column
+kb_data$Event <- 0
+
+# Create the Event column: 1 if event occurred, 0 if censored
+kb_data$Event[last_instance_index] <- ifelse(kb_data$censor[last_instance_index] == 0, 1, 0)
+
+# Verify the event indicator
+table(kb_data$Event)
+```
+
+### Step 2: Transform Data
+
+Create a proper status variable for survival analysis:
+```{r transform-data}
+# Aggregate censor by id to get final status
+id_df <- aggregate(censor ~ id, data = kb_data, FUN = max)
+
+# Join and create status variable
+kb2 <- kb_data %>%
+  select(-censor) %>%
+  inner_join(id_df, by = "id")
+
+# Create status: 0 = censored, 1 = event
+kb2$status <- (kb2$censor + 1) %% 2
+
+# Check the prepared data
+head(kb2, 10)
+cat("\nEvent status summary:\n")
+table(kb2$status)
+```
+
+## Fitting a G2G Model with Time-Varying Covariates
+
+We fit a G2G model with time-varying coupon usage and purchase behavior:
+```{r fit-model}
+# Fit G2G model with time-varying covariates
+fit_full <- G2G_varying_MLE(
+  fo = Surv(week, status) ~ coupon + anyp,
+  data = kb2,
+  subject = "id"
+)
+```
+
+## Model Results
+
+### Convergence Check
+```{r check-convergence}
+# Check convergence
+cat("Convergence code:", fit_full$convergence, "\n")
+cat("Negative log-likelihood:", round(fit_full$value, 2), "\n")
+cat("Log-likelihood:", round(-fit_full$value, 2), "\n\n")
+
+if (fit_full$convergence == 0) {
+  cat("✓ Model converged successfully.\n")
+}
+```
+
+### Parameter Estimates
+```{r results}
+# Create a formatted table of parameter estimates
+results <- data.frame(
+  Parameter = names(fit_full$par),
+  Estimate = fit_full$par,
+  SE = fit_full$par_stderr,
+  Lower_95 = fit_full$par_lower,
+  Upper_95 = fit_full$par_upper,
+  row.names = NULL
+)
+
+knitr::kable(
+  results, 
+  digits = 3,
+  caption = "G2G Model Parameter Estimates with 95% Confidence Intervals",
+  col.names = c("Parameter", "Estimate", "Std. Error", "Lower 95% CI", "Upper 95% CI")
+)
+```
+
+### Interpretation
+
+The model estimates four parameters:
+
+- **r (shape)**: `r round(fit_full$par[1], 3)` - Controls the shape of the gamma distribution (representing unobserved heterogeneity)
+- **α (rate)**: `r round(fit_full$par[2], 3)` - Controls the rate of the gamma distribution (baseline hazard parameter)
+- **coupon**: `r round(fit_full$par[3], 3)` - Effect of coupon usage on the hazard rate
+- **anyp**: `r round(fit_full$par[4], 3)` - Effect of purchase behavior on the hazard rate
+
+**Covariate Interpretation:**
+
+- **Positive coefficient**: Increases hazard (shorter survival/retention time)
+- **Negative coefficient**: Decreases hazard (longer survival/retention time)
+
+**Hazard Ratios:**
+```{r hazard-ratios}
+# Calculate and display hazard ratios
+hr_coupon <- exp(fit_full$par[3])
+hr_anyp <- exp(fit_full$par[4])
+
+hr_table <- data.frame(
+  Covariate = c("coupon", "anyp"),
+  Coefficient = c(fit_full$par[3], fit_full$par[4]),
+  Hazard_Ratio = c(hr_coupon, hr_anyp),
+  Interpretation = c(
+    ifelse(hr_coupon > 1, "Increases hazard", "Decreases hazard"),
+    ifelse(hr_anyp > 1, "Increases hazard", "Decreases hazard")
+  )
+)
+
+knitr::kable(
+  hr_table,
+  digits = 3,
+  caption = "Hazard Ratios for Time-Varying Covariates",
+  col.names = c("Covariate", "Coefficient", "Hazard Ratio", "Interpretation")
+)
+```
+
+For example, a hazard ratio of `r round(hr_coupon, 3)` for coupon means that each unit increase in coupon usage multiplies the hazard by `r round(hr_coupon, 3)`.
+
+## Model Comparison
+
+### Fit Reduced Models
+
+Compare the full model with reduced models containing only one covariate:
+```{r fit-reduced}
+# Model with only coupon
+fit_coupon <- G2G_varying_MLE(
+  fo = Surv(week, status) ~ coupon,
+  data = kb2,
+  subject = "id"
+)
+
+# Model with only anyp
+fit_anyp <- G2G_varying_MLE(
+  fo = Surv(week, status) ~ anyp,
+  data = kb2,
+  subject = "id"
+)
+```
+
+### Compare Log-Likelihoods
+```{r compare-models}
+# Create comparison table
+model_comparison <- data.frame(
+  Model = c("Full (coupon + anyp)", "Coupon only", "Anyp only"),
+  Log_Likelihood = c(-fit_full$value, -fit_coupon$value, -fit_anyp$value),
+  N_Parameters = c(length(fit_full$par), length(fit_coupon$par), length(fit_anyp$par))
+)
+
+knitr::kable(
+  model_comparison,
+  digits = 2,
+  caption = "Model Comparison by Log-Likelihood",
+  col.names = c("Model", "Log-Likelihood", "Number of Parameters")
+)
+```
+
+### Likelihood Ratio Tests
+
+Test the significance of individual covariates:
+```{r lrt}
+# Likelihood ratio test for coupon
+lrt_coupon <- 2 * (-fit_full$value - (-fit_anyp$value))
+p_coupon <- pchisq(lrt_coupon, df = 1, lower.tail = FALSE)
+
+# Likelihood ratio test for anyp
+lrt_anyp <- 2 * (-fit_full$value - (-fit_coupon$value))
+p_anyp <- pchisq(lrt_anyp, df = 1, lower.tail = FALSE)
+
+# Create comparison table
+lrt_results <- data.frame(
+  Covariate = c("coupon", "anyp"),
+  LRT_Statistic = c(lrt_coupon, lrt_anyp),
+  df = c(1, 1),
+  P_Value = c(p_coupon, p_anyp),
+  Significant = c(
+    ifelse(p_coupon < 0.05, "Yes", "No"),
+    ifelse(p_anyp < 0.05, "Yes", "No")
+  )
+)
+
+knitr::kable(
+  lrt_results,
+  digits = c(0, 3, 0, 4, 0),
+  caption = "Likelihood Ratio Tests for Individual Covariates",
+  col.names = c("Covariate", "LRT Statistic", "df", "P-value", "Significant (α=0.05)")
+)
+```
+
+The likelihood ratio test compares nested models to determine whether including a covariate significantly improves model fit. A p-value < 0.05 indicates that the covariate has a statistically significant effect on the hazard.
+
+## Visualizations
+
+### Distribution of Event Probability
+```{r visualization-hist, fig.cap="Distribution of event probability derived from the estimated gamma distribution"}
+# Simulate from the estimated gamma distribution
+set.seed(123)
+n_sim <- 10000
+gamma_samples <- rgamma(n_sim, shape = fit_full$par[1], rate = fit_full$par[2])
+p_samples <- 1 - exp(-gamma_samples)
+
+# Create histogram with density overlay
+hist(p_samples, 
+     breaks = 50, 
+     probability = TRUE,
+     main = "Distribution of Event Probability (p)",
+     xlab = "Event Probability (p)", 
+     ylab = "Density",
+     col = "lightblue", 
+     border = "white")
+
+# Add density line
+lines(density(p_samples), col = "darkblue", lwd = 2)
+
+# Add summary statistics
+abline(v = mean(p_samples), col = "red", lwd = 2, lty = 2)
+abline(v = median(p_samples), col = "orange", lwd = 2, lty = 2)
+legend("topright", 
+       legend = c("Density", "Mean", "Median"), 
+       col = c("darkblue", "red", "orange"), 
+       lwd = 2, 
+       lty = c(1, 2, 2))
+
+# Print summary
+cat("\nSummary Statistics:\n")
+cat("Mean event probability:", round(mean(p_samples), 3), "\n")
+cat("Median event probability:", round(median(p_samples), 3), "\n")
+cat("SD event probability:", round(sd(p_samples), 3), "\n")
+```
+
+This visualization shows the heterogeneity in event probabilities across the population, as captured by the gamma distribution.
+
+### Parameter Confidence Intervals
+```{r viz-ci, fig.cap="95% Confidence intervals for model parameters"}
+# Prepare data for plotting
+par_names <- names(fit_full$par)
+estimates <- fit_full$par
+lower <- fit_full$par_lower
+upper <- fit_full$par_upper
+
+# Create confidence interval plot
+par(mar = c(5, 8, 4, 2))
+plot(estimates, 1:length(estimates), 
+     xlim = range(c(lower, upper)),
+     pch = 19, 
+     yaxt = "n",
+     xlab = "Parameter Estimate",
+     ylab = "",
+     main = "Parameter Estimates with 95% Confidence Intervals")
+
+# Add confidence intervals
+segments(lower, 1:length(estimates), upper, 1:length(estimates), lwd = 2)
+
+# Add y-axis labels
+axis(2, at = 1:length(estimates), labels = par_names, las = 1)
+
+# Add vertical line at zero for reference
+abline(v = 0, lty = 2, col = "gray")
+```
+
+## Model Diagnostics
+
+### Parameter Validity Checks
+```{r diagnostics-params}
+cat("=== Model Diagnostics ===\n\n")
+
+# Check for NA parameters
+if (any(is.na(fit_full$par))) {
+  cat("⚠ Warning: Some parameters are NA\n")
+} else {
+  cat("✓ All parameters are finite\n")
+}
+
+# Check for finite standard errors
+if (any(!is.finite(fit_full$par_stderr))) {
+  cat("⚠ Warning: Some standard errors are not finite\n")
+} else {
+  cat("✓ All standard errors are finite\n")
+}
+
+# Verify parameters are within confidence intervals
+within_ci <- (fit_full$par >= fit_full$par_lower) & 
+             (fit_full$par <= fit_full$par_upper)
+if (all(within_ci)) {
+  cat("✓ All parameters are within their 95% confidence intervals\n")
+} else {
+  cat("⚠ Warning: Some parameters are outside their confidence intervals\n")
+}
+```
+
+### Summary Statistics
+```{r diagnostics-summary}
+cat("\n=== Summary Statistics ===\n")
+cat("Number of parameters estimated:", length(fit_full$par), "\n")
+cat("Number of subjects:", length(unique(kb2$id)), "\n")
+cat("Total observations:", nrow(kb2), "\n")
+cat("Number of events:", sum(kb2$status), "\n")
+cat("Number of censored:", sum(1 - kb2$status), "\n")
+cat("Event rate:", round(mean(kb2$status), 3), "\n")
+```
+
+## Saving Results
+```{r save-results, eval=FALSE}
+# Save model object
+saveRDS(fit_full, "g2g_varying_results.rds")
+
+# Export results table
+write.csv(results, "g2g_varying_estimates.csv", row.names = FALSE)
+
+# Export likelihood ratio test results
+write.csv(lrt_results, "g2g_lrt_tests.csv", row.names = FALSE)
+
+cat("\n✓ Results saved successfully\n")
+```
+
+## Summary
+
+This vignette demonstrated:
+
+1. ✓ Understanding time-varying covariate data structure
+2. ✓ Preparing data for time-varying analysis
+3. ✓ Fitting a G2G model with time-varying covariates
+4. ✓ Extracting and interpreting parameter estimates
+5. ✓ Comparing models with different specifications
+6. ✓ Performing likelihood ratio tests
+7. ✓ Visualizing model results
+8. ✓ Checking model diagnostics
+
+## Key Takeaways
+
+- **Time-varying covariates** allow modeling of dynamic relationships where predictor values change over time
+- **G2G models** account for both time-varying effects and unobserved heterogeneity through the gamma-distributed frailty
+- **Model comparison** via likelihood ratio tests helps identify which covariates are statistically significant
+- **Proper data preparation** is crucial: each subject must have multiple rows with a subject identifier
+- The shape parameter (r = `r round(fit_full$par[1], 3)`) indicates `r ifelse(fit_full$par[1] > 1, "increasing", "decreasing")` heterogeneity in the population
+
+## Next Steps
+
+- Explore interaction effects between time-varying covariates
+- Investigate non-linear effects using transformations
+- Compare with Cox proportional hazards models with time-varying covariates
+- Apply to your own datasets with longitudinal structure
+- See the companion vignette on static covariates for time-invariant analysis
+
+## References
+
+- Schmittlein, D. C., & Morrison, D. G. (1983). Prediction of future random events with the condensed negative binomial distribution. *Journal of the American Statistical Association*, 78(382), 449-456.
+
+- Vaupel, J. W., Manton, K. G., & Stallard, E. (1979). The impact of heterogeneity in individual frailty on the dynamics of mortality. *Demography*, 16(3), 439-454.
+
+- Therneau, T. M., & Grambsch, P. M. (2000). *Modeling Survival Data: Extending the Cox Model*. Springer.
+
+## Session Information
+```{r session-info}
+sessionInfo()
+```
