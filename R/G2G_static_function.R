@@ -32,12 +32,12 @@ G2G_static_LL <- function(par, df) {
 #' @param formula A formula object (e.g., Surv(time, status) ~ x1 + x2)
 #' @param data A data frame containing the variables
 #' @return Optimization results with parameter estimates and standard errors
-#' @export
-#' @importFrom stats aggregate optim as.formula ave model.matrix
+#' @importFrom stats aggregate optim as.formula ave model.matrix model.frame model.response
 #' @examples
 #' # Example with veteran dataset
 #' # library(survival)
 #' # fit <- G2G_static_MLE(Surv(time, status) ~ age + karno, data = veteran)
+#' @export
 G2G_static_MLE <- function(formula, data) {
   
   # Extract variables from formula
@@ -56,7 +56,12 @@ G2G_static_MLE <- function(formula, data) {
     method = "BFGS",
     hessian = TRUE
   )
+  # Construct parameter names
+  par_names <- c("r (shape)", "alpha (rate)", colnames(X))
+
+  names(solution$par) <- par_names
   
+
   # Calculate standard errors and confidence intervals
   solution$par_stderr <- sqrt(diag(solve(solution$hessian)))
   solution$par_upper <- solution$par + 1.96 * solution$par_stderr

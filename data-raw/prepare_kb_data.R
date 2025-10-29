@@ -11,18 +11,18 @@ library(usethis)    # for use_data()
 kb_raw <- read_csv("data-raw/kb_covars.csv")
 
 # ---- Clean / Transform ----
-kb_covars <- kb_raw %>%
+kb_data <- kb_raw %>%
   rename_with(tolower)
 
 # ---- Print Columns and Data Types ----
 message("--- Column Names (kb_data) ---")
-print(names(kb_covars))
+print(names(kb_data))
 message("\n--- Data Types (kb_data) ---")
-print(str(kb_covars))
+print(str(kb_data))
 message("---------------------------------\n")
 
 # ---- Verify ----
-stopifnot(!any(is.na(kb_covars)))
+stopifnot(!any(is.na(kb_data)))
 
 # ---- Save ----
-usethis::use_data(kb_covars, overwrite = TRUE)
+usethis::use_data(kb_data, overwrite = TRUE)

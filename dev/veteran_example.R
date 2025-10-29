@@ -25,7 +25,6 @@ fit$par
 ## ----results------------------------------------------------------------------
 # Create a table of estimates with confidence intervals
 results <- data.frame(
-  Parameter = c("r", "alpha"),
   Estimate = fit$par,
   SE = fit$par_stderr,
   Lower_95 = fit$par_lower,
