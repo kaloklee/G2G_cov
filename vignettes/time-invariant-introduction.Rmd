@@ -1,0 +1,239 @@
+---
+title: "Introduction to G2Gcov: Grassia(II)-Geometric Survival Models with Time-Invariant Covariates"
+author: "Aaron Ramsey"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Introduction to G2Gcov: Grassia(II)-Geometric Survival Models with Time-Invariant Covariates}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+  %\VignetteDepends{survival}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.width = 7,
+  fig.height = 5,
+  warning = FALSE,
+  message = FALSE,
+  error = FALSE
+)
+```
+
+## Overview
+
+The **G2Gcov** package provides tools for fitting Grassia(II)-Geometric (G2G) survival models that incorporate both time-varying and time-invariant covariates. This vignette demonstrates how to:
+
+- Fit a G2G model to survival data using time-invariant covariates
+- Extract and interpret parameter estimates
+- Visualize model results
+- Check model diagnostics
+
+## Load Required Packages
+
+```{r load-packages}
+library(G2Gcov)
+library(survival)
+```
+
+## Example Dataset: Veteran's Administration Lung Cancer Study
+
+We'll use the `veteran` dataset from the `survival` package, which contains data from a randomized trial of two treatment regimens for lung cancer.
+
+```{r load-data}
+# Load the veteran dataset
+data(veteran, package="survival")
+
+# View the first few rows
+head(veteran)
+```
+
+**Variables:**
+We will be using the age and karno variables, but feel free to experiment with any that you would like.
+
+- `time`: Survival time in days
+- `status`: Censoring status (1 = death, 0 = censored)
+- `age`: Age in years
+- `karno`: Karnofsky performance score (0-100, higher is better)
+
+## Fitting a G2G Model
+
+We fit a G2G model with age and Karnofsky score as covariates:
+
+```{r fit-model}
+# Fit G2G model
+fit <- G2G_static_MLE(
+  Surv(time, status) ~ age + karno, 
+  data = veteran
+)
+
+# Print model summary
+print(fit)
+```
+
+## Model Results
+
+### Parameter Estimates
+
+```{r results}
+# Check if model fitting succeeded
+if (!is.null(fit$par) && length(fit$par) > 0) {
+  # Create a formatted table of parameter estimates
+  results <- data.frame(
+    Parameter = names(fit$par),
+    Estimate = fit$par,
+    SE = fit$par_stderr,
+    Lower_95 = fit$par_lower,
+    Upper_95 = fit$par_upper,
+    row.names = NULL
+  )
+  
+  knitr::kable(
+    results, 
+    digits = 3,
+    caption = "G2G Model Parameter Estimates with 95% Confidence Intervals",
+    col.names = c("Parameter", "Estimate", "Std. Error", "Lower 95% CI", "Upper 95% CI")
+  )
+} else {
+  cat("Model fitting did not produce parameter estimates.\n")
+  cat("Please check the model specification and data.\n")
+}
+```
+
+### Interpretation
+
+```{r interpretation, results='asis', echo=FALSE}
+if (!is.null(fit$par) && length(fit$par) >= 2) {
+  cat("The model estimates two key parameters:\n\n")
+  cat("- **r (shape)**: ", round(fit$par[1], 3), 
+      " - Controls the shape of the gamma distribution\n")
+  cat("- **α (rate)**: ", round(fit$par[2], 3), 
+      " - Controls the rate of the gamma distribution\n\n")
+  cat("The 95% confidence intervals indicate the uncertainty in these estimates.\n")
+}
+```
+
+## Visualizations
+
+### Distribution of Event Probability
+
+```{r visualization-hist, fig.cap="Distribution of event probability derived from the estimated gamma distribution"}
+# Only create visualization if model fitting succeeded
+if (!is.null(fit$par) && length(fit$par) >= 2) {
+  # Simulate from the estimated gamma distribution
+  set.seed(123)
+  n_sim <- 10000
+  gamma_samples <- rgamma(n_sim, shape = fit$par[1], rate = fit$par[2])
+  p_samples <- 1 - exp(-gamma_samples)
+  
+  # Create histogram with density overlay
+  hist(p_samples, 
+       breaks = 50, 
+       probability = TRUE,
+       main = "Distribution of Event Probability (p)",
+       xlab = "Event Probability (p)", 
+       ylab = "Density",
+       col = "lightblue", 
+       border = "white")
+  
+  # Add density line
+  lines(density(p_samples), col = "darkblue", lwd = 2)
+  
+  # Add summary statistics
+  abline(v = mean(p_samples), col = "red", lwd = 2, lty = 2)
+  legend("topright", 
+         legend = c("Density", "Mean"), 
+         col = c("darkblue", "red"), 
+         lwd = 2, 
+         lty = c(1, 2))
+  
+  cat("\nMean event probability:", round(mean(p_samples), 3), "\n")
+} else {
+  cat("Cannot create visualization - model fitting did not succeed.\n")
+}
+```
+
+## Model Diagnostics
+
+### Convergence Check
+
+```{r diagnostics}
+# Check if model converged
+if (!is.null(fit$convergence)) {
+  cat("Convergence code:", fit$convergence, "\n")
+  if (fit$convergence == 0) {
+    cat("✓ Model converged successfully.\n")
+  } else {
+    cat("⚠ Warning: Model may not have converged properly.\n")
+  }
+} else {
+  cat("Convergence information not available.\n")
+}
+
+# Log-likelihood
+if (!is.null(fit$loglik)) {
+  cat("\nLog-likelihood:", round(fit$loglik, 2), "\n")
+}
+
+# AIC (if available)
+if (!is.null(fit$AIC)) {
+  cat("AIC:", round(fit$AIC, 2), "\n")
+}
+
+# Number of parameters
+if (!is.null(fit$par)) {
+  cat("\nNumber of parameters estimated:", length(fit$par), "\n")
+}
+```
+
+## Troubleshooting
+
+If the model did not fit successfully, consider:
+
+1. **Check data quality**: Ensure there are no missing values or extreme outliers
+2. **Examine covariates**: Check for multicollinearity or scaling issues
+3. **Review convergence**: Try different starting values or optimization methods
+4. **Sample size**: Ensure sufficient events for stable estimation
+
+```{r troubleshooting, eval=FALSE}
+# Check for missing values
+sum(is.na(veteran$time))
+sum(is.na(veteran$status))
+sum(is.na(veteran$age))
+sum(is.na(veteran$karno))
+
+# Check event counts
+table(veteran$status)
+
+# Check covariate ranges
+summary(veteran[, c("age", "karno")])
+```
+
+## Summary
+
+This vignette demonstrated:
+
+1. ✓ Loading and preparing survival data
+2. ✓ Fitting a G2G model with covariates
+3. ✓ Extracting and interpreting parameter estimates (when available)
+4. ✓ Visualizing model results
+5. ✓ Checking model diagnostics
+
+## Next Steps
+
+- Explore model comparison with other survival models (e.g., Cox proportional hazards)
+- Investigate time-varying covariates (if supported)
+- Perform sensitivity analyses
+- Apply to your own datasets
+
+## References
+
+Add relevant references to papers describing the G2G model methodology.
+
+## Session Information
+
+```{r session-info}
+sessionInfo()
+```

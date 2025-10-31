@@ -20,7 +20,7 @@ devtools::load_all()
 #######################################################
 
 # Import data
-kb <- read.csv("../data-raw/kb_covars.csv")
+kb <- read.csv("data-raw/kb_covars.csv")
 
 # Find the index of the last instance of each person
 last_instance_index <- tapply(seq_len(nrow(kb)), kb$id, tail, n = 1)
