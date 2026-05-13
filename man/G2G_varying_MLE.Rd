@@ -36,3 +36,17 @@ A list containing the optimization results from \code{\link[stats]{optim}}
 Fits a Grassia(II)-Gamma (G2G) survival model with time-varying covariates using
 maximum likelihood estimation.
 }
+\examples{
+\donttest{
+  data(kb_data)
+  kb_data$status <- 1L - kb_data$censor
+  fit <- G2G_varying_MLE(
+    "Surv(week, status) ~ coupon + anyp",
+    data    = kb_data,
+    subject = "id"
+  )
+  print(fit$par)
+  print(fit$par_stderr)
+}
+
+}

@@ -127,6 +127,18 @@ G2G_varying_LL <- function(par,data_df) {
 #'
 #' @export
 #' @importFrom stats aggregate optim as.formula ave model.matrix
+#' @examples
+#' \donttest{
+#'   data(kb_data)
+#'   kb_data$status <- 1L - kb_data$censor
+#'   fit <- G2G_varying_MLE(
+#'     "Surv(week, status) ~ coupon + anyp",
+#'     data    = kb_data,
+#'     subject = "id"
+#'   )
+#'   print(fit$par)
+#'   print(fit$par_stderr)
+#' }
 #'
 G2G_varying_MLE <- function(fo, data, subject) {
   
@@ -152,9 +164,15 @@ G2G_varying_MLE <- function(fo, data, subject) {
   par_names <- c("r (shape)", "alpha (rate)", colnames(X[,-1]))
 
   names(solution$par) <- par_names
-  solution$par_stderr<-sqrt(diag(solve(solution$hessian)))
-  solution$par_upper<-solution$par+1.96*solution$par_stderr
-  solution$par_lower<-solution$par-1.96*solution$par_stderr
+  hess_inv <- tryCatch(solve(solution$hessian),
+                       error = function(e) NULL)
+  solution$par_stderr <- if (is.null(hess_inv)) {
+    rep(NA_real_, length(solution$par))
+  } else {
+    sqrt(diag(hess_inv))
+  }
+  solution$par_upper <- solution$par + 1.96 * solution$par_stderr
+  solution$par_lower <- solution$par - 1.96 * solution$par_stderr
 
   # Exponentiate first two parameters
   exp_idx <- 1:2

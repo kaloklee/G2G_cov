@@ -34,9 +34,14 @@ G2G_static_LL <- function(par, df) {
 #' @return Optimization results with parameter estimates and standard errors
 #' @importFrom stats aggregate optim as.formula ave model.matrix model.frame model.response
 #' @examples
-#' # Example with veteran dataset
-#' # library(survival)
-#' # fit <- G2G_static_MLE(Surv(time, status) ~ age + karno, data = veteran)
+#' \donttest{
+#'   if (requireNamespace("survival", quietly = TRUE)) {
+#'     library(survival)
+#'     fit <- G2G_static_MLE(Surv(time, status) ~ age + karno, data = veteran)
+#'     print(fit$par)
+#'     print(fit$par_stderr)
+#'   }
+#' }
 #' @export
 G2G_static_MLE <- function(formula, data) {
   
@@ -63,7 +68,13 @@ G2G_static_MLE <- function(formula, data) {
   
 
   # Calculate standard errors and confidence intervals
-  solution$par_stderr <- sqrt(diag(solve(solution$hessian)))
+  hess_inv <- tryCatch(solve(solution$hessian),
+                       error = function(e) NULL)
+  solution$par_stderr <- if (is.null(hess_inv)) {
+    rep(NA_real_, length(solution$par))
+  } else {
+    sqrt(diag(hess_inv))
+  }
   solution$par_upper <- solution$par + 1.96 * solution$par_stderr
   solution$par_lower <- solution$par - 1.96 * solution$par_stderr
   

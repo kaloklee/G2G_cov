@@ -24,3 +24,5 @@
 ^revdep$
 ^dev/
 ^.pdf
+^\.positai$
+^\.claude$
