@@ -100,16 +100,16 @@ G2G_varying_LL <- function(par,data_df) {
 
 #' Fit G2G Model with Time-Varying Covariates
 #'
-#' Fits a Grassia(II)-Gamma (G2G) survival model with time-varying covariates using
-#' maximum likelihood estimation.
+#' Fits a Grassia(II)-Geometric (G2G) survival model with time-varying covariates
+#' using maximum likelihood estimation.
 #'
 #' @param fo Formula object specifying the model in the format 
 #'   \code{Surv(time, status) ~ x1 + x2 + ...} where time is the observation
 #'   time, status is the event indicator, and x1, x2, etc. are time-varying
 #'   covariates. Note: The formula should use variable names, not column indices.
 #' @param data Data frame containing all variables specified in the formula.
-#'   Data should be in long format with one row per time point per subject 
-#'   (i.e. period-person format)
+#'   Data should be in long format with one row per time point per subject
+#'   (person-period format).
 #' @param subject Character string specifying the name of the subject ID column
 #'   in the data frame. This column identifies which observations belong to
 #'   the same subject over time.
@@ -136,19 +136,51 @@ G2G_varying_LL <- function(par,data_df) {
 #'     data    = kb_data,
 #'     subject = "id"
 #'   )
-#'   print(fit$par)
-#'   print(fit$par_stderr)
+#'   print(fit)
 #' }
 #'
 G2G_varying_MLE <- function(fo, data, subject) {
-  
-  #fo: the formula in this format: Surv(A,B)
-  #data: the data frame
-  #id: a text field for the subject
-  
-  #the dependent variables: time and status
-  time_name = all.vars(as.formula(fo))[1];
-  status_name = all.vars(as.formula(fo))[2];
+
+  # --- Input validation -------------------------------------------------------
+  if (!is.data.frame(data))
+    stop("'data' must be a data frame.", call. = FALSE)
+  if (!is.character(subject) || length(subject) != 1L)
+    stop("'subject' must be a single character string.", call. = FALSE)
+  if (!subject %in% names(data))
+    stop("Subject column '", subject, "' not found in 'data'.", call. = FALSE)
+
+  vars        <- all.vars(as.formula(fo))
+  time_name   <- vars[1]
+  status_name <- vars[2]
+  cov_names   <- vars[-(1:2)]
+
+  if (length(cov_names) == 0L)
+    stop("Formula must include at least one covariate on the right-hand side.",
+         call. = FALSE)
+
+  missing_cols <- setdiff(c(time_name, status_name, cov_names), names(data))
+  if (length(missing_cols) > 0L)
+    stop("Column(s) not found in 'data': ",
+         paste(missing_cols, collapse = ", "), ".", call. = FALSE)
+
+  na_cols <- c(subject, time_name, status_name, cov_names)
+  na_cols <- na_cols[vapply(na_cols,
+                            function(v) anyNA(data[[v]]), logical(1L))]
+  if (length(na_cols) > 0L)
+    stop("NA values found in column(s): ",
+         paste(na_cols, collapse = ", "),
+         ". Remove or impute missing values before fitting.", call. = FALSE)
+
+  if (!all(unique(data[[status_name]]) %in% c(0, 1)))
+    stop("Status column '", status_name,
+         "' must contain only 0 and 1.", call. = FALSE)
+  if (sum(data[[status_name]]) == 0L)
+    stop("No events found in '", status_name,
+         "' (all values are 0). At least one event is required.", call. = FALSE)
+  if (any(data[[time_name]] < 1))
+    stop("Time column '", time_name,
+         "' must contain values >= 1.", call. = FALSE)
+  # ---------------------------------------------------------------------------
   
   #df_temp<-data[,c(all.vars(as.formula(fo))[-c(1:2)])];
   df_temp <- data[, c(all.vars(as.formula(fo))[-c(1:2)]), drop = FALSE];
@@ -179,8 +211,9 @@ G2G_varying_MLE <- function(fo, data, subject) {
   solution$par[exp_idx] <- exp(solution$par[exp_idx])
   solution$par_upper[exp_idx] <- exp(solution$par_upper[exp_idx])
   solution$par_lower[exp_idx] <- exp(solution$par_lower[exp_idx])
-  return(solution); 
-   
+  class(solution) <- c("G2Gcov", "list")
+  return(solution)
+
 }
 
 #' Internal Optimization for Time-Varying Model
@@ -201,15 +234,20 @@ G2G_varying_optim <- function(model_data) {
   
   nvar=dim(model_data)[2]-1;
   
-  solution=optim(par=c(log(0.5),log(0.5),rep(0,nvar-2)),
-                 fn=G2G_varying_LL,
-                 data_df = model_data,
-                 method="BFGS",
-                 control = list(maxit=1000),
-                 hessian = TRUE);
+  solution <- withCallingHandlers(
+    optim(par     = c(log(0.5), log(0.5), rep(0, nvar - 2)),
+          fn      = G2G_varying_LL,
+          data_df = model_data,
+          method  = "BFGS",
+          control = list(maxit = 1000),
+          hessian = TRUE),
+    warning = function(w) {
+      if (grepl("NaNs produced", conditionMessage(w)))
+        invokeRestart("muffleWarning")
+    }
+  )
 
-  
-  return (solution);
+  return(solution)
   
 }
 

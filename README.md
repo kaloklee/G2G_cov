@@ -24,7 +24,7 @@ Or install the development version from GitHub:
 
 ```r
 # install.packages("remotes")
-remotes::install_github("your-org/G2G_cov")
+remotes::install_github("kaloklee/G2G_cov")
 ```
 
 ---

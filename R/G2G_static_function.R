@@ -72,28 +72,56 @@ G2G_static_LL <- function(par, df) {
 #'   if (requireNamespace("survival", quietly = TRUE)) {
 #'     library(survival)
 #'     fit <- G2G_static_MLE(Surv(time, status) ~ age + karno, data = veteran)
-#'     print(fit$par)
-#'     print(fit$par_stderr)
+#'     print(fit)
 #'   }
 #' }
 #' @export
 G2G_static_MLE <- function(formula, data) {
-  
+
+  # --- Input validation -------------------------------------------------------
+  if (!is.data.frame(data))
+    stop("'data' must be a data frame.", call. = FALSE)
+
+  vars <- all.vars(formula)
+  missing_cols <- setdiff(vars, names(data))
+  if (length(missing_cols) > 0L)
+    stop("Column(s) not found in 'data': ",
+         paste(missing_cols, collapse = ", "), ".", call. = FALSE)
+
+  na_cols <- vars[vapply(vars, function(v) anyNA(data[[v]]), logical(1L))]
+  if (length(na_cols) > 0L)
+    stop("NA values found in column(s): ",
+         paste(na_cols, collapse = ", "),
+         ". Remove or impute missing values before fitting.", call. = FALSE)
+  # ---------------------------------------------------------------------------
+
   # Extract variables from formula
   mf <- model.frame(formula, data = data)
-  y <- model.response(mf)
-  X <- model.matrix(formula, data = data)[, -1, drop = FALSE]
-  
+  y  <- model.response(mf)
+  X  <- model.matrix(formula, data = data)[, -1, drop = FALSE]
+
+  if (sum(y[, 2]) == 0L)
+    stop("No events found (all status = 0). At least one event is required.",
+         call. = FALSE)
+  n_par <- 2L + ncol(X)
+  if (nrow(data) <= n_par)
+    stop("Insufficient data: need more rows than parameters (", n_par, ").",
+         call. = FALSE)
+
   # Create data frame for optimization
   df <- data.frame(time = y[, 1], status = y[, 2], X)
-  
-  # Run optimization
-  solution <- optim(
-    par = c(log(0.5), log(0.5), rep(0, ncol(X))),
-    fn = G2G_static_LL,
-    df = df,
-    method = "BFGS",
-    hessian = TRUE
+
+  # Run optimization — muffle expected NaNs produced during BFGS exploration
+  solution <- withCallingHandlers(
+    optim(par     = c(log(0.5), log(0.5), rep(0, ncol(X))),
+          fn      = G2G_static_LL,
+          df      = df,
+          method  = "BFGS",
+          hessian = TRUE),
+    warning = function(w) {
+      if (grepl("NaNs produced", conditionMessage(w)))
+        invokeRestart("muffleWarning")
+    }
   )
   # Construct parameter names
   par_names <- c("r (shape)", "alpha (rate)", colnames(X))
@@ -117,6 +145,6 @@ G2G_static_MLE <- function(formula, data) {
   solution$par[exp_idx] <- exp(solution$par[exp_idx])
   solution$par_upper[exp_idx] <- exp(solution$par_upper[exp_idx])
   solution$par_lower[exp_idx] <- exp(solution$par_lower[exp_idx])
-  
+  class(solution) <- c("G2Gcov", "list")
   return(solution)
 }

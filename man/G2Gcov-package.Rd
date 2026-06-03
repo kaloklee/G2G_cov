@@ -8,6 +8,14 @@
 \description{
 Implements the Grassia(II)-Geometric (G2G) distribution model with time-varying covariates for discrete-time survival analysis. Provides maximum likelihood estimation following Fader and Hardie's methodology for incorporating covariates in discrete-time duration models. Supports both static and time-varying covariates using person-period formatted data.
 }
+\seealso{
+Useful links:
+\itemize{
+  \item \url{https://github.com/kaloklee/G2G_cov}
+  \item Report bugs at \url{https://github.com/kaloklee/G2G_cov/issues}
+}
+
+}
 \author{
 \strong{Maintainer}: Aaron Ramsey \email{aarondaelramsey@gmail.com}
 

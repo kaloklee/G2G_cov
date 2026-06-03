@@ -13,8 +13,8 @@ time, status is the event indicator, and x1, x2, etc. are time-varying
 covariates. Note: The formula should use variable names, not column indices.}
 
 \item{data}{Data frame containing all variables specified in the formula.
-Data should be in long format with one row per time point per subject 
-(i.e. period-person format)}
+Data should be in long format with one row per time point per subject
+(person-period format).}
 
 \item{subject}{Character string specifying the name of the subject ID column
 in the data frame. This column identifies which observations belong to
@@ -33,8 +33,8 @@ A list containing the optimization results from \code{\link[stats]{optim}}
   \item{hessian}{Hessian matrix at the optimum}
 }
 \description{
-Fits a Grassia(II)-Gamma (G2G) survival model with time-varying covariates using
-maximum likelihood estimation.
+Fits a Grassia(II)-Geometric (G2G) survival model with time-varying covariates
+using maximum likelihood estimation.
 }
 \examples{
 \donttest{
@@ -45,8 +45,7 @@ maximum likelihood estimation.
     data    = kb_data,
     subject = "id"
   )
-  print(fit$par)
-  print(fit$par_stderr)
+  print(fit)
 }
 
 }

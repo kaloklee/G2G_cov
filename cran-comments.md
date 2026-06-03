@@ -4,23 +4,13 @@
 
 Checked on: Windows 11 x64, R 4.5.2
 
-0 errors | 0 warnings | 1 note
-
-The single note is:
-
-    checking for future file timestamps ... NOTE
-    unable to verify current time
-
-This is a known Windows-specific network issue where R cannot reach a time
-server to validate file timestamps. It is not reproducible on Linux/macOS and
-does not reflect any problem with the package itself. CRAN's own checks do not
-flag this as an issue.
+0 errors | 0 warnings | 0 notes
 
 ## Platform testing
 
-- Windows 11 x64 (R 4.5.2): 0 errors | 0 warnings | 1 note (timestamp, see above)
-- Recommend also running rhub::check_for_cran() before final submission for
-  Linux and macOS coverage.
+- Windows 11 x64 (R 4.5.2): 0 errors | 0 warnings | 0 notes
+- Cross-platform checks via `devtools::check_win_devel()` and
+  `rhub::check_for_cran()` should be run before final submission.
 
 ## Notes for CRAN reviewers
 
@@ -28,12 +18,16 @@ flag this as an issue.
 * The package implements the Grassia(II)-Geometric (G2G) discrete-time survival
   model with support for both time-invariant and time-varying covariates,
   following the methodology of Fader & Hardie (1997).
-* Optimisation examples are wrapped in \donttest{} as they take several seconds;
-  all examples complete successfully when run.
+* All \donttest{} examples run successfully; they are wrapped in \donttest{}
+  because numerical optimisation takes several seconds per call.
+* During BFGS optimisation, R may internally produce "NaNs produced" warnings
+  as the optimizer explores regions of the parameter space where the
+  log-likelihood is undefined. These are expected, benign, and are now
+  suppressed within the package using withCallingHandlers(). They will not
+  appear to end users.
 * The package uses survival::Surv() only in vignettes and optional tests
   (listed under Suggests). Core estimation functions do not require it.
-* The single Suggests package 'dplyr' is used only within vignette code for
-  data manipulation demonstrations.
+* URL and BugReports fields point to https://github.com/kaloklee/G2G_cov.
 
 ## Downstream dependencies
 

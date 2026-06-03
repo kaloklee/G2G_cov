@@ -1,4 +1,4 @@
-# Tests for utility functions and G2G MLE
+# Tests for utility functions, input validation, G2G MLE, and print method
 
 # --- Utility: log1mexp ---
 
@@ -94,4 +94,89 @@ test_that("G2G_varying_MLE negative log-likelihood is finite", {
 
   expect_true(is.finite(fit$value))
   expect_true(fit$value > 0)
+})
+
+# --- Input validation: G2G_varying_MLE ---
+
+test_that("G2G_varying_MLE errors on non-data-frame input", {
+  expect_error(
+    G2G_varying_MLE("Surv(week, status) ~ coupon", data = list(), subject = "id"),
+    "'data' must be a data frame"
+  )
+})
+
+test_that("G2G_varying_MLE errors when subject column is missing", {
+  kb <- kb_data; kb$status <- 1L - kb$censor
+  expect_error(
+    G2G_varying_MLE("Surv(week, status) ~ coupon", data = kb, subject = "person"),
+    "not found in 'data'"
+  )
+})
+
+test_that("G2G_varying_MLE errors when formula column is missing", {
+  kb <- kb_data; kb$status <- 1L - kb$censor
+  expect_error(
+    G2G_varying_MLE("Surv(week, status) ~ nonexistent", data = kb, subject = "id"),
+    "not found in 'data'"
+  )
+})
+
+test_that("G2G_varying_MLE errors when no events present", {
+  kb <- kb_data
+  kb$status <- 0L          # force all censored
+  expect_error(
+    G2G_varying_MLE("Surv(week, status) ~ coupon", data = kb, subject = "id"),
+    "No events found"
+  )
+})
+
+test_that("G2G_varying_MLE errors on NA values in key columns", {
+  kb <- kb_data; kb$status <- 1L - kb$censor
+  kb$coupon[1] <- NA
+  expect_error(
+    G2G_varying_MLE("Surv(week, status) ~ coupon", data = kb, subject = "id"),
+    "NA values found"
+  )
+})
+
+# --- Input validation: G2G_static_MLE ---
+
+test_that("G2G_static_MLE errors on non-data-frame input", {
+  expect_error(
+    G2G_static_MLE(Surv(time, status) ~ x, data = list()),
+    "'data' must be a data frame"
+  )
+})
+
+test_that("G2G_static_MLE errors when formula column is missing", {
+  skip_if_not_installed("survival")
+  library(survival)
+  expect_error(
+    G2G_static_MLE(Surv(time, status) ~ nonexistent, data = veteran),
+    "not found in 'data'"
+  )
+})
+
+test_that("G2G_static_MLE errors on NA in formula columns", {
+  skip_if_not_installed("survival")
+  library(survival)
+  vet2 <- veteran; vet2$age[1] <- NA
+  expect_error(
+    G2G_static_MLE(Surv(time, status) ~ age + karno, data = vet2),
+    "NA values found"
+  )
+})
+
+# --- print.G2Gcov ---
+
+test_that("print.G2Gcov returns the fit object invisibly", {
+  kb <- kb_data; kb$status <- 1L - kb$censor
+  fit <- G2G_varying_MLE("Surv(week, status) ~ coupon + anyp",
+                          data = kb, subject = "id")
+  expect_s3_class(fit, "G2Gcov")
+  out <- capture.output(result <- print(fit))
+  expect_identical(result, fit)
+  expect_true(any(grepl("G2G Model Fit", out)))
+  expect_true(any(grepl("Log-likelihood", out)))
+  expect_true(any(grepl("r \\(shape\\)", out)))
 })

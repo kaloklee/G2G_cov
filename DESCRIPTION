@@ -20,6 +20,8 @@ Description: Implements the Grassia(II)-Geometric (G2G) distribution model with
     covariates in discrete-time duration models. Supports both static and
     time-varying covariates using person-period formatted data.
 License: Apache License (>= 2)
+URL: https://github.com/kaloklee/G2G_cov
+BugReports: https://github.com/kaloklee/G2G_cov/issues
 Encoding: UTF-8
 Language: en-US
 LazyData: true

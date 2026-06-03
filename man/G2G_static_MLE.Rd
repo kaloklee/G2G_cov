@@ -47,8 +47,7 @@ log-hazard coefficients.
   if (requireNamespace("survival", quietly = TRUE)) {
     library(survival)
     fit <- G2G_static_MLE(Surv(time, status) ~ age + karno, data = veteran)
-    print(fit$par)
-    print(fit$par_stderr)
+    print(fit)
   }
 }
 }
