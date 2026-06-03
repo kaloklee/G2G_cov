@@ -41,3 +41,21 @@ Kaplan-Meier actual curve against G2G model predictions: one for
 percent surviving and one for period-over-period retention rate.
 An optional grouping variable produces faceted panels.
 }
+\examples{
+\donttest{
+  data(kb_data)
+  kb_data$status <- 1L - kb_data$censor
+  out <- plot_insample_holdout_paper(
+    fo       = "Surv(week, status) ~ coupon + anyp",
+    data     = kb_data,
+    subject  = "id",
+    split_at = 12L
+  )
+  print(out$p_survival)
+  print(out$p_retention)
+}
+}
+\seealso{
+\code{\link{plot_survival_insample_g2g}},
+  \code{\link{plot_survival_holdout_g2g}}
+}

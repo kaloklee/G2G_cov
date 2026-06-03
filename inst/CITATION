@@ -1,0 +1,27 @@
+bibentry(
+  bibtype  = "Manual",
+  title    = "{G2Gcov}: Grassia(II)-Geometric Distribution with Time-Varying Covariates",
+  author   = c(
+    person("Ka Lok", "Lee"),
+    person("Aaron", "Ramsey"),
+    person("Noah", "Park")
+  ),
+  year     = "2026",
+  note     = "R package version 0.1.0",
+  url      = "https://cran.r-project.org/package=G2Gcov"
+)
+
+bibentry(
+  bibtype  = "Article",
+  title    = "How to Project Customer Retention",
+  author   = c(
+    person("Peter S.", "Fader"),
+    person("Bruce G. S.", "Hardie")
+  ),
+  journal  = "Journal of Interactive Marketing",
+  year     = "1997",
+  volume   = "11",
+  number   = "1",
+  pages    = "61--73",
+  doi      = "10.1002/(SICI)1520-6653(199724)11:1<61::AID-DIR5>3.0.CO;2-0"
+)

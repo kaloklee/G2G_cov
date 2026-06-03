@@ -20,6 +20,18 @@ Default is \code{c(0.05, 0.95)}.}
 A \code{ggplot} object.
 }
 \description{
-Visualises the gamma distribution over baseline churn propensity implied
+Visualizes the gamma distribution over baseline churn propensity implied
 by the fitted \code{r} (shape) and \code{alpha} (rate) parameters.
+}
+\examples{
+\donttest{
+  data(kb_data)
+  kb_data$status <- 1L - kb_data$censor
+  fit <- G2G_varying_MLE("Surv(week, status) ~ coupon + anyp",
+                          data = kb_data, subject = "id")
+  plot_p0(fit)
+}
+}
+\seealso{
+\code{\link{G2G_varying_MLE}}, \code{\link{G2G_static_MLE}}
 }

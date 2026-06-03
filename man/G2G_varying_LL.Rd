@@ -14,7 +14,7 @@ G2G_varying_LL(par, data_df)
 \describe{
   \item{id}{Subject identifier}
   \item{time}{Time point for each observation}
-  \item{status}{Event indicator (0 = no occurence, 1 = event occurred)}
+  \item{status}{Event indicator (0 = no occurrence, 1 = event occurred)}
   \item{...}{Time-varying covariates (remaining columns)}
 }}
 }

@@ -78,7 +78,8 @@
   tab <- merge(data.frame(time = times, n = at_risk), d_t, by = "time", all.x = TRUE)
   tab$status[is.na(tab$status)] <- 0
   tab$S_KM <- cumprod(1 - tab$status / pmax(tab$n, 1))
-  tab[, c("time", "S_KM", "n", "d" = "status")]
+  tab$d    <- tab$status
+  tab[, c("time", "S_KM", "n", "d")]
 }
 
 .actual_retention <- function(km_tab) {
@@ -131,7 +132,7 @@ NULL
 #' Plot the Baseline Propensity Distribution of a Fitted G2G Model
 #'
 #' @description
-#' Visualises the gamma distribution over baseline churn propensity implied
+#' Visualizes the gamma distribution over baseline churn propensity implied
 #' by the fitted \code{r} (shape) and \code{alpha} (rate) parameters.
 #'
 #' @param solution Object returned by \code{\link{G2G_varying_MLE}} or
@@ -142,6 +143,15 @@ NULL
 #' @param n Integer grid size for the density curve. Default is \code{400}.
 #'
 #' @return A \code{ggplot} object.
+#' @seealso \code{\link{G2G_varying_MLE}}, \code{\link{G2G_static_MLE}}
+#' @examples
+#' \donttest{
+#'   data(kb_data)
+#'   kb_data$status <- 1L - kb_data$censor
+#'   fit <- G2G_varying_MLE("Surv(week, status) ~ coupon + anyp",
+#'                           data = kb_data, subject = "id")
+#'   plot_p0(fit)
+#' }
 #' @export
 
 plot_p0 <- function(solution, probs = c(0.05, 0.95), n = 400) {
@@ -187,6 +197,18 @@ plot_p0 <- function(solution, probs = c(0.05, 0.95), n = 400) {
 #'   data structure.
 #'
 #' @return A \code{ggplot} object.
+#' @seealso \code{\link{plot_survival_holdout_g2g}},
+#'   \code{\link{plot_insample_holdout_paper}}
+#' @examples
+#' \donttest{
+#'   data(kb_data)
+#'   kb_data$status <- 1L - kb_data$censor
+#'   plot_survival_insample_g2g(
+#'     fo      = "Surv(week, status) ~ coupon + anyp",
+#'     train   = kb_data,
+#'     subject = "id"
+#'   )
+#' }
 #' @export
 plot_survival_insample_g2g <- function(fo, train, subject,
                                        model_type = c("auto","varying","static")) {
@@ -220,6 +242,21 @@ plot_survival_insample_g2g <- function(fo, train, subject,
 #'   \code{"static"}.
 #'
 #' @return A \code{ggplot} object.
+#' @seealso \code{\link{plot_survival_insample_g2g}},
+#'   \code{\link{plot_insample_holdout_paper}}
+#' @examples
+#' \donttest{
+#'   data(kb_data)
+#'   kb_data$status <- 1L - kb_data$censor
+#'   train <- kb_data[kb_data$week <= 12L, ]
+#'   test  <- kb_data[kb_data$week >  12L, ]
+#'   plot_survival_holdout_g2g(
+#'     fo      = "Surv(week, status) ~ coupon + anyp",
+#'     train   = train,
+#'     test    = test,
+#'     subject = "id"
+#'   )
+#' }
 #' @export
 plot_survival_holdout_g2g <- function(fo, train, test, subject,
                                       model_type = c("auto","varying","static")) {
@@ -270,6 +307,21 @@ plot_survival_holdout_g2g <- function(fo, train, test, subject,
 #' @return A named list with elements \code{p_survival} (a \code{ggplot}
 #'   of percent surviving), \code{p_retention} (a \code{ggplot} of
 #'   retention rate), and \code{solution} (the fitted model object).
+#' @seealso \code{\link{plot_survival_insample_g2g}},
+#'   \code{\link{plot_survival_holdout_g2g}}
+#' @examples
+#' \donttest{
+#'   data(kb_data)
+#'   kb_data$status <- 1L - kb_data$censor
+#'   out <- plot_insample_holdout_paper(
+#'     fo       = "Surv(week, status) ~ coupon + anyp",
+#'     data     = kb_data,
+#'     subject  = "id",
+#'     split_at = 12L
+#'   )
+#'   print(out$p_survival)
+#'   print(out$p_retention)
+#' }
 #' @export
 plot_insample_holdout_paper <- function(fo, data, subject, split_at, group = NULL,
                                         model_type = c("auto","varying","static")) {

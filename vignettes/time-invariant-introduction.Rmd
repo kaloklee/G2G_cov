@@ -1,10 +1,10 @@
 ---
-title: "Introduction to G2Gcov: Grassia(II)-Geometric Survival Models with Time-Invariant Covariates"
-author: "Aaron Ramsey"
+title: "G2G Models with Time-Invariant Covariates"
+author: "Ka Lok Lee, Aaron Ramsey, and Noah Park"
 date: "`r Sys.Date()`"
 output: rmarkdown::html_vignette
 vignette: >
-  %\VignetteIndexEntry{Introduction to G2Gcov: Grassia(II)-Geometric Survival Models with Time-Invariant Covariates}
+  %\VignetteIndexEntry{G2G Models with Time-Invariant Covariates}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
   %\VignetteDepends{survival}
@@ -13,224 +13,195 @@ vignette: >
 ```{r setup, include = FALSE}
 knitr::opts_chunk$set(
   collapse = TRUE,
-  comment = "#>",
-  fig.width = 7,
+  comment  = "#>",
+  fig.width  = 7,
   fig.height = 5,
-  warning = FALSE,
-  message = FALSE,
-  error = FALSE
+  warning  = FALSE,
+  message  = FALSE
 )
 ```
 
-## Overview
+## The G2G Model
 
-The **G2Gcov** package provides tools for fitting Grassia(II)-Geometric (G2G) survival models that incorporate both time-varying and time-invariant covariates. This vignette demonstrates how to:
+The **Grassia(II)-Geometric (G2G)** model is a discrete-time survival model that
+accounts for unobserved heterogeneity across subjects (Fader and Hardie, 1997).
+Each subject has a latent event propensity drawn from a Gamma distribution:
 
-- Fit a G2G model to survival data using time-invariant covariates
-- Extract and interpret parameter estimates
-- Visualize model results
-- Check model diagnostics
+$$p_0 \sim \text{Gamma}(r,\, \alpha)$$
 
-## Load Required Packages
+Covariates shift this baseline propensity through a log-linear link. For a
+subject with covariate vector **x**, the cumulative covariate effect at period
+*t* is $C(t) = t \cdot \exp(\mathbf{x}'\boldsymbol{\beta})$, and the survivor
+function is:
+
+$$S(t) = \left(1 + \frac{C(t)}{\alpha}\right)^{-r}$$
+
+The parameters **r** (shape) and **alpha** (rate) characterize the population
+distribution of baseline propensity; **beta** is a vector of covariate
+log-hazard coefficients.
+
+## Setup
 
 ```{r load-packages}
 library(G2Gcov)
 library(survival)
 ```
 
-## Example Dataset: Veteran's Administration Lung Cancer Study
+## Example Data: Veteran Lung Cancer Trial
 
-We'll use the `veteran` dataset from the `survival` package, which contains data from a randomized trial of two treatment regimens for lung cancer.
+We use the `veteran` dataset from the `survival` package (Kalbfleisch and
+Prentice, 1980), a randomized trial of two treatments for lung cancer with
+137 patients.
 
 ```{r load-data}
-# Load the veteran dataset
-data(veteran, package="survival")
+data(veteran, package = "survival")
 
-# View the first few rows
-head(veteran)
+# Add a unique subject ID (required by the visualisation functions)
+veteran$id <- seq_len(nrow(veteran))
+
+head(veteran[, c("id", "time", "status", "age", "karno")])
 ```
 
-**Variables:**
-We will be using the age and karno variables, but feel free to experiment with any that you would like.
+| Variable | Description |
+|----------|-------------|
+| `time`   | Survival time (days) |
+| `status` | 1 = death, 0 = censored |
+| `age`    | Age in years |
+| `karno`  | Karnofsky performance score (0–100; higher is better) |
 
-- `time`: Survival time in days
-- `status`: Censoring status (1 = death, 0 = censored)
-- `age`: Age in years
-- `karno`: Karnofsky performance score (0-100, higher is better)
+```{r data-summary}
+cat("Subjects:", nrow(veteran), "\n")
+cat("Events:  ", sum(veteran$status), "\n")
+cat("Censored:", sum(1 - veteran$status), "\n")
+```
 
-## Fitting a G2G Model
+## Fitting the Model
 
-We fit a G2G model with age and Karnofsky score as covariates:
+`G2G_static_MLE()` accepts a standard `Surv()` formula. Internally it
+maximizes the G2G log-likelihood via BFGS and returns parameter estimates,
+standard errors, and 95% confidence intervals.
 
 ```{r fit-model}
-# Fit G2G model
 fit <- G2G_static_MLE(
-  Surv(time, status) ~ age + karno, 
+  Surv(time, status) ~ age + karno,
   data = veteran
 )
 
-# Print model summary
-print(fit)
+cat("Convergence code:", fit$convergence,
+    ifelse(fit$convergence == 0, "(converged)", "(check starting values)"), "\n")
+cat("Negative log-likelihood:", round(fit$value, 2), "\n")
 ```
 
-## Model Results
+## Parameter Estimates
 
-### Parameter Estimates
+```{r results-table}
+results <- data.frame(
+  Parameter = names(fit$par),
+  Estimate  = fit$par,
+  SE        = fit$par_stderr,
+  CI_Lower  = fit$par_lower,
+  CI_Upper  = fit$par_upper,
+  row.names = NULL
+)
 
-```{r results}
-# Check if model fitting succeeded
-if (!is.null(fit$par) && length(fit$par) > 0) {
-  # Create a formatted table of parameter estimates
-  results <- data.frame(
-    Parameter = names(fit$par),
-    Estimate = fit$par,
-    SE = fit$par_stderr,
-    Lower_95 = fit$par_lower,
-    Upper_95 = fit$par_upper,
-    row.names = NULL
-  )
-  
-  knitr::kable(
-    results, 
-    digits = 3,
-    caption = "G2G Model Parameter Estimates with 95% Confidence Intervals",
-    col.names = c("Parameter", "Estimate", "Std. Error", "Lower 95% CI", "Upper 95% CI")
-  )
-} else {
-  cat("Model fitting did not produce parameter estimates.\n")
-  cat("Please check the model specification and data.\n")
-}
+knitr::kable(
+  results,
+  digits    = 3,
+  col.names = c("Parameter", "Estimate", "Std. Error",
+                "Lower 95% CI", "Upper 95% CI"),
+  caption   = "G2G parameter estimates -- veteran data"
+)
 ```
 
-### Interpretation
+**Interpreting the estimates:**
 
-```{r interpretation, results='asis', echo=FALSE}
-if (!is.null(fit$par) && length(fit$par) >= 2) {
-  cat("The model estimates two key parameters:\n\n")
-  cat("- **r (shape)**: ", round(fit$par[1], 3), 
-      " - Controls the shape of the gamma distribution\n")
-  cat("- **α (rate)**: ", round(fit$par[2], 3), 
-      " - Controls the rate of the gamma distribution\n\n")
-  cat("The 95% confidence intervals indicate the uncertainty in these estimates.\n")
-}
+- **r (shape)** and **alpha (rate)** define the Gamma distribution over
+  baseline event propensity. The population mean propensity is
+  $r / \alpha = `r round(fit$par[1] / fit$par[2], 3)`$.
+- Covariate coefficients are on the log-hazard scale. Positive values
+  increase the hazard (shorter survival); negative values decrease it.
+
+**Hazard ratios** are obtained by exponentiating covariate coefficients:
+
+```{r hazard-ratios}
+coef_idx <- seq_along(fit$par)[-(1:2)]
+hr_df <- data.frame(
+  Covariate   = names(fit$par)[coef_idx],
+  Coefficient = fit$par[coef_idx],
+  HR          = exp(fit$par[coef_idx]),
+  row.names   = NULL
+)
+knitr::kable(
+  hr_df,
+  digits    = 3,
+  col.names = c("Covariate", "Coefficient", "Hazard Ratio"),
+  caption   = "Covariate hazard ratios"
+)
 ```
 
-## Visualizations
+A hazard ratio below 1 indicates a protective effect. Higher Karnofsky score
+(better functional status) is associated with reduced hazard, consistent with
+clinical expectation.
 
-### Distribution of Event Probability
+## Baseline Propensity Distribution
 
-```{r visualization-hist, fig.cap="Distribution of event probability derived from the estimated gamma distribution"}
-# Only create visualization if model fitting succeeded
-if (!is.null(fit$par) && length(fit$par) >= 2) {
-  # Simulate from the estimated gamma distribution
-  set.seed(123)
-  n_sim <- 10000
-  gamma_samples <- rgamma(n_sim, shape = fit$par[1], rate = fit$par[2])
-  p_samples <- 1 - exp(-gamma_samples)
-  
-  # Create histogram with density overlay
-  hist(p_samples, 
-       breaks = 50, 
-       probability = TRUE,
-       main = "Distribution of Event Probability (p)",
-       xlab = "Event Probability (p)", 
-       ylab = "Density",
-       col = "lightblue", 
-       border = "white")
-  
-  # Add density line
-  lines(density(p_samples), col = "darkblue", lwd = 2)
-  
-  # Add summary statistics
-  abline(v = mean(p_samples), col = "red", lwd = 2, lty = 2)
-  legend("topright", 
-         legend = c("Density", "Mean"), 
-         col = c("darkblue", "red"), 
-         lwd = 2, 
-         lty = c(1, 2))
-  
-  cat("\nMean event probability:", round(mean(p_samples), 3), "\n")
-} else {
-  cat("Cannot create visualization - model fitting did not succeed.\n")
-}
+`plot_p0()` plots the fitted Gamma density over baseline event propensity.
+The shaded region covers the central 90% of the distribution (default:
+central 90% band); the solid vertical line marks the mean.
+
+```{r plot-p0, fig.cap = "Fitted Gamma distribution over baseline event propensity"}
+plot_p0(fit)
+```
+
+A wide distribution indicates substantial unobserved heterogeneity; a narrow
+distribution suggests a relatively homogeneous population.
+
+
+## Survivor Curve
+
+`plot_survival_insample_g2g()` plots the mean predicted survivor function
+S(t) over the training data.
+
+```{r plot-survival, fig.cap = "In-sample G2G mean survivor curve"}
+plot_survival_insample_g2g(
+  fo         = Surv(time, status) ~ age + karno,
+  train      = veteran,
+  subject    = "id",
+  model_type = "static"
+)
 ```
 
 ## Model Diagnostics
 
-### Convergence Check
-
 ```{r diagnostics}
-# Check if model converged
-if (!is.null(fit$convergence)) {
-  cat("Convergence code:", fit$convergence, "\n")
-  if (fit$convergence == 0) {
-    cat("✓ Model converged successfully.\n")
-  } else {
-    cat("⚠ Warning: Model may not have converged properly.\n")
-  }
+# AIC: 2k - 2 * log-likelihood
+k   <- length(fit$par)
+aic <- 2 * k + 2 * fit$value
+cat("Parameters:", k, "\n")
+cat("AIC:       ", round(aic, 2), "\n")
+
+# Standard errors (NA when Hessian is singular)
+if (anyNA(fit$par_stderr)) {
+  cat("Note: some standard errors are NA (near-singular Hessian).\n")
 } else {
-  cat("Convergence information not available.\n")
-}
-
-# Log-likelihood
-if (!is.null(fit$loglik)) {
-  cat("\nLog-likelihood:", round(fit$loglik, 2), "\n")
-}
-
-# AIC (if available)
-if (!is.null(fit$AIC)) {
-  cat("AIC:", round(fit$AIC, 2), "\n")
-}
-
-# Number of parameters
-if (!is.null(fit$par)) {
-  cat("\nNumber of parameters estimated:", length(fit$par), "\n")
+  cat("All standard errors are finite.\n")
 }
 ```
-
-## Troubleshooting
-
-If the model did not fit successfully, consider:
-
-1. **Check data quality**: Ensure there are no missing values or extreme outliers
-2. **Examine covariates**: Check for multicollinearity or scaling issues
-3. **Review convergence**: Try different starting values or optimization methods
-4. **Sample size**: Ensure sufficient events for stable estimation
-
-```{r troubleshooting, eval=FALSE}
-# Check for missing values
-sum(is.na(veteran$time))
-sum(is.na(veteran$status))
-sum(is.na(veteran$age))
-sum(is.na(veteran$karno))
-
-# Check event counts
-table(veteran$status)
-
-# Check covariate ranges
-summary(veteran[, c("age", "karno")])
-```
-
-## Summary
-
-This vignette demonstrated:
-
-1. ✓ Loading and preparing survival data
-2. ✓ Fitting a G2G model with covariates
-3. ✓ Extracting and interpreting parameter estimates (when available)
-4. ✓ Visualizing model results
-5. ✓ Checking model diagnostics
-
-## Next Steps
-
-- Explore model comparison with other survival models (e.g., Cox proportional hazards)
-- Investigate time-varying covariates (if supported)
-- Perform sensitivity analyses
-- Apply to your own datasets
 
 ## References
 
-Add relevant references to papers describing the G2G model methodology.
+Fader, P.S. and Hardie, B.G.S. (1997). How to project customer retention.
+*Journal of Interactive Marketing*, 11(1), 61--73.
+<https://doi.org/10.1002/(SICI)1520-6653(199724)11:1%3C61::AID-DIR5%3E3.0.CO;2-0>
+
+Grassia, A. (1977). On a family of distributions with argument between 0 and
+1 obtained by transformation of the Gamma distribution and derived compound
+distributions. *Australian Journal of Statistics*, 19(2), 108--114.
+<https://doi.org/10.1111/j.1467-842X.1977.tb01277.x>
+
+Kalbfleisch, J.D. and Prentice, R.L. (1980).
+*The Statistical Analysis of Failure Time Data*.
+Wiley, New York.
 
 ## Session Information
 

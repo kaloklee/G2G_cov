@@ -21,7 +21,9 @@ Description: Implements the Grassia(II)-Geometric (G2G) distribution model with
     time-varying covariates using person-period formatted data.
 License: Apache License (>= 2)
 Encoding: UTF-8
+Language: en-US
 LazyData: true
+LazyDataCompression: xz
 Depends: R (>= 3.5.0)
 RoxygenNote: 7.3.3
 VignetteBuilder: knitr
@@ -32,6 +34,5 @@ Suggests:
     survival,
     knitr,
     rmarkdown,
-    testthat (>= 3.0.0),
-    dplyr
+    testthat (>= 3.0.0)
 Config/testthat/edition: 3

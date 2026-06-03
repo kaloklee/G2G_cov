@@ -30,3 +30,18 @@ A \code{ggplot} object.
 Fits the G2G model on the supplied training data and plots the mean
 predicted survivor function S(t) over the training period.
 }
+\examples{
+\donttest{
+  data(kb_data)
+  kb_data$status <- 1L - kb_data$censor
+  plot_survival_insample_g2g(
+    fo      = "Surv(week, status) ~ coupon + anyp",
+    train   = kb_data,
+    subject = "id"
+  )
+}
+}
+\seealso{
+\code{\link{plot_survival_holdout_g2g}},
+  \code{\link{plot_insample_holdout_paper}}
+}

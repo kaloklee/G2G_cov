@@ -1,4 +1,4 @@
-#' @keywords internal
+#' @keywords package
 #' @importFrom stats aggregate optim as.formula ave model.matrix model.frame model.response
 "_PACKAGE"
 

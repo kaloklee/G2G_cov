@@ -2,20 +2,45 @@
 % Please edit documentation in R/G2G_static_function.R
 \name{G2G_static_MLE}
 \alias{G2G_static_MLE}
-\title{Fit G2G Model with Static Covariates}
+\title{Fit a G2G Model with Time-Invariant Covariates}
 \usage{
 G2G_static_MLE(formula, data)
 }
 \arguments{
-\item{formula}{A formula object (e.g., Surv(time, status) ~ x1 + x2)}
+\item{formula}{A formula of the form
+\code{Surv(time, status) ~ x1 + x2 + ...} where \code{time} is the
+observed period, \code{status} is the event indicator (1 = event,
+0 = censored), and \code{x1}, \code{x2}, etc. are time-invariant
+covariates.}
 
-\item{data}{A data frame containing the variables}
+\item{data}{A data frame containing all variables referenced in
+\code{formula}. One row per subject.}
 }
 \value{
-Optimization results with parameter estimates and standard errors
+A list containing the optimization results from
+  \code{\link[stats]{optim}} with the following additional elements:
+  \item{par}{Named numeric vector of parameter estimates. The first two
+    elements are \code{r (shape)} and \code{alpha (rate)}, returned on
+    the natural (exponentiated) scale. Remaining elements are covariate
+    log-hazard coefficients.}
+  \item{par_stderr}{Standard errors derived from the observed Hessian.
+    \code{NA} when the Hessian is singular or near-singular.}
+  \item{par_upper}{Upper bounds of 95\% Wald confidence intervals.}
+  \item{par_lower}{Lower bounds of 95\% Wald confidence intervals.}
+  \item{value}{Negative log-likelihood at the optimum.}
+  \item{convergence}{Convergence code from \code{optim} (0 = success).}
+  \item{hessian}{Observed Hessian matrix at the optimum.}
 }
 \description{
-Fit G2G Model with Static Covariates
+Fits a Grassia(II)-Geometric (G2G) survival model with time-invariant
+covariates using maximum likelihood estimation via BFGS. Each subject is
+represented by a single row. The survivor function at discrete period
+\eqn{t} is
+\eqn{S(t) = (1 + t \cdot \exp(\mathbf{x}'\boldsymbol{\beta}) /
+\alpha)^{-r}},
+where \eqn{r} and \eqn{\alpha} are the shape and rate of the Gamma
+mixing distribution and \eqn{\boldsymbol{\beta}} are covariate
+log-hazard coefficients.
 }
 \examples{
 \donttest{
@@ -26,4 +51,9 @@ Fit G2G Model with Static Covariates
     print(fit$par_stderr)
   }
 }
+}
+\seealso{
+\code{\link{G2G_varying_MLE}} for the time-varying extension;
+  \code{\link{plot_p0}} to visualize the fitted baseline propensity
+  distribution.
 }
