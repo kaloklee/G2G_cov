@@ -7,7 +7,7 @@ vignette: >
   %\VignetteIndexEntry{Time-Varying Covariates with G2G Models}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
-  %\VignetteDepends{survival}
+  %\VignetteDepends{survival, eha}
 ---
 
 ```{r setup, include = FALSE}
@@ -44,19 +44,21 @@ Data must be in **person-period (long) format**:
 - The event indicator equals 1 in the period the event occurred, 0 in all
   other periods (including the final period for censored subjects)
 
-## Setup
+---
 
-```{r load-packages}
+## Example 1: Customer Churn (`kb_data`)
+
+The `kb_data` dataset included in the package tracks weekly covariate values
+for a panel of customers. Each row is one customer-week. This example shows
+the typical marketing application: do coupon activity and trade promotions
+affect the weekly probability of churn?
+
+```{r load-packages-1}
 library(G2Gcov)
 library(survival)
 ```
 
-## Example Data: Customer Behavior (`kb_data`)
-
-The `kb_data` dataset included in the package tracks weekly covariate values
-for a panel of customers. Each row is one customer-week.
-
-```{r load-data}
+```{r load-kb}
 data(kb_data, package = "G2Gcov")
 head(kb_data)
 ```
@@ -65,27 +67,21 @@ head(kb_data)
 |-------------|-------------|
 | `id`        | Customer identifier |
 | `week`      | Week number |
-| `num_weeks` | Total weeks the customer was observed |
+| `num_weeks` | Total weeks observed |
 | `censor`    | 1 = still active (censored), 0 = churned (event) |
 | `coupon`    | Coupon stock covariate (time-varying) |
 | `anyp`      | Trade-promotions covariate (time-varying) |
 
-## Data Preparation
+### Data Preparation
 
-`censor = 0` indicates the event (churn) occurred in that week. The model
-requires a `status` column equal to `1 - censor`:
+`censor = 0` indicates the event occurred. The model requires a `status`
+column equal to `1 - censor`:
 
-```{r prepare-data}
+```{r prepare-kb}
 kb_data$status <- 1L - kb_data$censor
 
-# Confirm format: one row per (id, week), unique
-stopifnot(!anyDuplicated(kb_data[, c("id", "week")]))
-
-# Summary at the subject level
 n_subjects <- length(unique(kb_data$id))
-n_events   <- sum(
-  tapply(kb_data$status, kb_data$id, max)  # 1 if subject ever had status=1
-)
+n_events   <- sum(tapply(kb_data$status, kb_data$id, max))
 
 cat("Subjects:        ", n_subjects, "\n")
 cat("Churned:         ", n_events, "\n")
@@ -93,26 +89,23 @@ cat("Censored:        ", n_subjects - n_events, "\n")
 cat("Total obs. rows: ", nrow(kb_data), "\n")
 ```
 
-## Fitting the Model
+### Fitting the Model
 
-`G2G_varying_MLE()` takes a `Surv()` formula, the long-format data frame, and
-the name of the subject ID column.
-
-```{r fit-full}
+```{r fit-kb}
 fit_full <- G2G_varying_MLE(
   fo      = Surv(week, status) ~ coupon + anyp,
   data    = kb_data,
   subject = "id"
 )
 
-cat("Convergence code:", fit_full$convergence,
+cat("Convergence:", fit_full$convergence,
     ifelse(fit_full$convergence == 0, "(converged)", "(check starting values)"), "\n")
 cat("Negative log-likelihood:", round(fit_full$value, 2), "\n")
 ```
 
-## Parameter Estimates
+### Parameter Estimates
 
-```{r results-table}
+```{r results-kb}
 results <- data.frame(
   Parameter = names(fit_full$par),
   Estimate  = fit_full$par,
@@ -121,7 +114,6 @@ results <- data.frame(
   CI_Upper  = fit_full$par_upper,
   row.names = NULL
 )
-
 knitr::kable(
   results,
   digits    = 3,
@@ -140,7 +132,7 @@ knitr::kable(
 
 ### Hazard Ratios
 
-```{r hazard-ratios}
+```{r hr-kb}
 coef_idx <- seq_along(fit_full$par)[-(1:2)]
 hr_df <- data.frame(
   Covariate   = names(fit_full$par)[coef_idx],
@@ -158,44 +150,16 @@ knitr::kable(
 )
 ```
 
-A hazard ratio greater than 1 means a one-unit increase in that covariate
-multiplies the period churn hazard by that factor.
+### Model Comparison and Likelihood Ratio Tests
 
-## Model Comparison
-
-### Fit Nested Models
-
-```{r fit-reduced}
+```{r lrt-kb}
 fit_coupon <- G2G_varying_MLE(
   fo = Surv(week, status) ~ coupon, data = kb_data, subject = "id"
 )
 fit_anyp <- G2G_varying_MLE(
   fo = Surv(week, status) ~ anyp,   data = kb_data, subject = "id"
 )
-```
 
-### Log-Likelihood Comparison
-
-```{r compare-models}
-mc <- data.frame(
-  Model        = c("Full (coupon + anyp)", "Coupon only", "Anyp only"),
-  LogLik       = c(-fit_full$value, -fit_coupon$value, -fit_anyp$value),
-  N_Parameters = c(length(fit_full$par), length(fit_coupon$par),
-                   length(fit_anyp$par)),
-  row.names    = NULL
-)
-knitr::kable(
-  mc,
-  digits    = 2,
-  col.names = c("Model", "Log-Likelihood", "Parameters"),
-  caption   = "Model comparison by log-likelihood"
-)
-```
-
-### Likelihood Ratio Tests
-
-```{r lrt}
-# LRT: full vs. model without one covariate
 lrt_coupon <- 2 * ((-fit_anyp$value)   - (-fit_full$value))
 lrt_anyp   <- 2 * ((-fit_coupon$value) - (-fit_full$value))
 
@@ -215,41 +179,158 @@ knitr::kable(
 )
 ```
 
-A small p-value indicates that removing that covariate significantly worsens
-model fit.
+### Visualizations
 
-## Visualizations
-
-### Baseline Propensity Distribution
-
-```{r plot-p0, fig.cap = "Fitted Gamma distribution over baseline churn propensity"}
+```{r plot-p0-kb, fig.cap = "Gamma distribution over baseline churn propensity"}
 plot_p0(fit_full)
 ```
 
-### In-Sample and Hold-Out Survival
-
-`plot_insample_holdout_paper()` splits the data at a chosen week, fits the
-model on the training period, and then plots observed (Kaplan-Meier) versus
-G2G-predicted survival and retention rates across both periods. The dashed
-vertical line marks the train/test boundary.
-
-```{r plot-paper, fig.cap = "Actual vs. G2G predicted survival (left) and retention (right)"}
-out <- plot_insample_holdout_paper(
+```{r plot-paper-kb, fig.cap = "Actual vs. G2G predicted survival and retention (kb_data)"}
+out_kb <- plot_insample_holdout_paper(
   fo       = Surv(week, status) ~ coupon + anyp,
   data     = kb_data,
   subject  = "id",
   split_at = 12L
 )
-
-print(out$p_survival)
-print(out$p_retention)
+print(out_kb$p_survival)
+print(out_kb$p_retention)
 ```
 
-Good model fit is indicated by the dashed G2G line tracking closely with
-the solid observed line, both within the training window and in the hold-out
-period beyond week 12.
+The dashed vertical line marks the train/test boundary at week 12. G2G
+predictions beyond this line are hold-out forecasts based solely on parameters
+estimated from the training window.
+
+---
+
+## Example 2: Historical Mortality (Scania)
+
+This example demonstrates that `G2G_varying_MLE()` applies equally to
+historical demographic data. The `scania` dataset from the `eha` package
+(Broström, 2012) records individual mortality histories in 19th-century
+Sweden. The key time-varying covariate is the annual log rye price
+(`foodprices`), a proxy for nutritional stress that shifts each year.
+
+```{r load-eha}
+library(eha)
+data(scania, package = "eha")
+data(logrye, package = "eha")
+```
+
+### Data Preparation
+
+We center observation time at age 50 so that period 1 = the first year
+observed at or after age 50, and compute each individual's spell length.
+
+```{r prepare-scania-individual}
+sc <- scania
+sc$exit      <- ceiling(sc$exit)
+sc$birthdate <- floor(sc$birthdate)
+sc$spell     <- sc$exit - sc$enter
+sc$enter     <- sc$enter - 50L
+sc$exit      <- sc$exit  - 50L
+sc           <- sc[sc$spell >= 1L, ]
+
+cat("Individuals:", nrow(sc), "  Events:", sum(sc$event), "\n")
+```
+
+The full dataset has over 12,000 individuals. We draw a reproducible sample
+of 500 subjects so the vignette builds in reasonable time. In practice,
+fit on the full dataset.
+
+```{r sample-scania}
+set.seed(123)
+ids_sample <- sample(unique(sc$id), 500L)
+sc_sample  <- sc[sc$id %in% ids_sample, ]
+```
+
+`eha::dataLong()` expands to one row per subject per year, then we join the
+annual log rye price.
+
+```{r prepare-scania-panel}
+sc_pp <- dataLong(
+  dataShort    = sc_sample,
+  timeColumn   = "spell",
+  eventColumn  = "event",
+  timeAsFactor = FALSE
+)
+
+# Rename columns and compute age / calendar year
+sc_pp$event      <- sc_pp$y
+sc_pp$exit       <- sc_pp$timeInt
+sc_pp$enter      <- sc_pp$exit - 1L
+sc_pp$age        <- sc_pp$enter + 50L
+sc_pp$year       <- sc_pp$age + floor(sc_pp$birthdate)
+
+# Join food prices and keep relevant columns
+sc_pp <- merge(sc_pp, logrye, by = "year", all.x = TRUE)
+sc_pp <- sc_pp[, c("id", "enter", "exit", "event",
+                   "sex", "immigrant", "age", "year", "foodprices")]
+
+cat("Person-period rows:", nrow(sc_pp), "\n")
+head(sc_pp)
+```
+
+### Fitting the Model
+
+```{r fit-scania}
+fit_sc <- G2G_varying_MLE(
+  fo      = Surv(exit, event) ~ sex + immigrant + foodprices,
+  data    = sc_pp,
+  subject = "id"
+)
+
+cat("Convergence:", fit_sc$convergence,
+    ifelse(fit_sc$convergence == 0, "(converged)", "(check starting values)"), "\n")
+cat("Negative log-likelihood:", round(fit_sc$value, 2), "\n")
+```
+
+### Parameter Estimates
+
+```{r results-scania}
+results_sc <- data.frame(
+  Parameter = names(fit_sc$par),
+  Estimate  = fit_sc$par,
+  SE        = fit_sc$par_stderr,
+  CI_Lower  = fit_sc$par_lower,
+  CI_Upper  = fit_sc$par_upper,
+  row.names = NULL
+)
+knitr::kable(
+  results_sc,
+  digits    = 3,
+  col.names = c("Parameter", "Estimate", "Std. Error",
+                "Lower 95% CI", "Upper 95% CI"),
+  caption   = "G2G parameter estimates -- Scania sample"
+)
+```
+
+The hazard ratio for `foodprices` represents the multiplicative change in
+mortality hazard for a one-unit increase in log rye price in a given year.
+A ratio above 1 indicates that higher food prices (nutritional stress)
+increase mortality risk in that period.
+
+### Visualization
+
+```{r plot-p0-scania, fig.cap = "Gamma distribution over baseline mortality propensity (Scania)"}
+plot_p0(fit_sc)
+```
+
+```{r plot-paper-scania, fig.cap = "Actual vs. G2G predicted survival and retention (Scania)"}
+out_sc <- plot_insample_holdout_paper(
+  fo       = Surv(exit, event) ~ sex + immigrant + foodprices,
+  data     = sc_pp,
+  subject  = "id",
+  split_at = 10L
+)
+print(out_sc$p_survival)
+print(out_sc$p_retention)
+```
+
+---
 
 ## References
+
+Broström, G. (2012). *Event History Analysis with R*. Chapman & Hall/CRC.
 
 Fader, P.S. and Hardie, B.G.S. (1997). How to project customer retention.
 *Journal of Interactive Marketing*, 11(1), 61--73.

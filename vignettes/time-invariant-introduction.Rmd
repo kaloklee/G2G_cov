@@ -54,12 +54,13 @@ Prentice, 1980), a randomized trial of two treatments for lung cancer with
 137 patients.
 
 ```{r load-data}
-data(veteran, package = "survival")
+# veteran is lazy-loaded in the survival package; accessible directly
+vet <- survival::veteran
 
 # Add a unique subject ID (required by the visualisation functions)
-veteran$id <- seq_len(nrow(veteran))
+vet$id <- seq_len(nrow(vet))
 
-head(veteran[, c("id", "time", "status", "age", "karno")])
+head(vet[, c("id", "time", "status", "age", "karno")])
 ```
 
 | Variable | Description |
@@ -70,9 +71,9 @@ head(veteran[, c("id", "time", "status", "age", "karno")])
 | `karno`  | Karnofsky performance score (0–100; higher is better) |
 
 ```{r data-summary}
-cat("Subjects:", nrow(veteran), "\n")
-cat("Events:  ", sum(veteran$status), "\n")
-cat("Censored:", sum(1 - veteran$status), "\n")
+cat("Subjects:", nrow(vet), "\n")
+cat("Events:  ", sum(vet$status), "\n")
+cat("Censored:", sum(1 - vet$status), "\n")
 ```
 
 ## Fitting the Model
@@ -84,7 +85,7 @@ standard errors, and 95% confidence intervals.
 ```{r fit-model}
 fit <- G2G_static_MLE(
   Surv(time, status) ~ age + karno,
-  data = veteran
+  data = vet
 )
 
 cat("Convergence code:", fit$convergence,
@@ -165,7 +166,7 @@ S(t) over the training data.
 ```{r plot-survival, fig.cap = "In-sample G2G mean survivor curve"}
 plot_survival_insample_g2g(
   fo         = Surv(time, status) ~ age + karno,
-  train      = veteran,
+  train      = vet,
   subject    = "id",
   model_type = "static"
 )
