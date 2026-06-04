@@ -2,15 +2,21 @@
 
 ## R CMD check results
 
-Checked on: Windows 11 x64, R 4.5.2
-
 0 errors | 0 warnings | 0 notes
 
 ## Platform testing
 
-- Windows 11 x64 (R 4.5.2): 0 errors | 0 warnings | 0 notes
-- Cross-platform checks via `devtools::check_win_devel()` and
-  `rhub::check_for_cran()` should be run before final submission.
+All platforms returned `Status: OK` with 0 errors, 0 warnings, 0 notes.
+
+| Platform                        | R version | Result |
+|---------------------------------|-----------|--------|
+| Windows 11 x64 (local)          | R 4.5.2   | OK     |
+| Linux x86_64 Ubuntu 24.04 LTS   | R-devel   | OK     |
+| macOS arm64 (macos-latest)      | R-devel   | OK     |
+| Windows (windows-latest)        | R-devel   | OK     |
+
+Linux, macOS, and Windows R-devel checks were run via R-hub v2 GitHub Actions
+(`rhub::rhub_check()`). Local Windows check run via `devtools::check()`.
 
 ## Notes for CRAN reviewers
 
@@ -22,9 +28,9 @@ Checked on: Windows 11 x64, R 4.5.2
   because numerical optimisation takes several seconds per call.
 * During BFGS optimisation, R may internally produce "NaNs produced" warnings
   as the optimizer explores regions of the parameter space where the
-  log-likelihood is undefined. These are expected, benign, and are now
-  suppressed within the package using withCallingHandlers(). They will not
-  appear to end users.
+  log-likelihood is undefined. These are expected, benign, and are suppressed
+  within the package using withCallingHandlers(). They do not appear to end
+  users and did not produce any warnings in R CMD check across any platform.
 * The package uses survival::Surv() only in vignettes and optional tests
   (listed under Suggests). Core estimation functions do not require it.
 * URL and BugReports fields point to https://github.com/kaloklee/G2G_cov.
