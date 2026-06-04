@@ -59,7 +59,7 @@ library(survival)
 ```
 
 ```{r load-kb}
-data(kb_data, package = "G2Gcov")
+kb_data <- G2Gcov::kb_data
 head(kb_data)
 ```
 
@@ -204,22 +204,40 @@ estimated from the training window.
 
 ## Example 2: Historical Mortality (Scania)
 
-This example demonstrates that `G2G_varying_MLE()` applies equally to
-historical demographic data. The `scania` dataset from the `eha` package
-(Broström, 2012) records individual mortality histories in 19th-century
-Sweden. The key time-varying covariate is the annual log rye price
-(`foodprices`), a proxy for nutritional stress that shifts each year.
+This example demonstrates that `G2G_varying_MLE()` generalizes beyond
+marketing data to historical demographic data. The `scania` dataset from the
+`eha` package (Broström, 2012) records individual mortality histories in
+19th-century Sweden. It combines two time-invariant covariates (`sex`,
+`immigrant`) with one genuinely time-varying covariate: the annual log rye
+price (`foodprices`), a proxy for nutritional stress that changes each
+calendar year. This makes it a natural application for the time-varying G2G
+model.
 
 ```{r load-eha}
-library(eha)
-data(scania, package = "eha")
-data(logrye, package = "eha")
+scania <- eha::scania
+logrye <- eha::logrye
 ```
+
+### Data Description
+
+The `scania` dataset is in individual-level (short) format — one row per
+person. The `logrye` dataset contains one row per calendar year with the
+log rye price for that year.
+
+| Variable     | Source    | Type           | Description |
+|--------------|-----------|----------------|-------------|
+| `id`         | `scania`  | Time-invariant | Individual identifier |
+| `sex`        | `scania`  | Time-invariant | Sex (female / male) |
+| `immigrant`  | `scania`  | Time-invariant | Immigrant status (yes / no) |
+| `event`      | `scania`  | Outcome        | 1 = died, 0 = censored |
+| `foodprices` | `logrye`  | Time-varying   | Log rye price for that calendar year |
 
 ### Data Preparation
 
-We center observation time at age 50 so that period 1 = the first year
-observed at or after age 50, and compute each individual's spell length.
+The `scania` data is in individual-level (short) format and must be converted
+to person-period (long) format before fitting. We center observation time at
+age 50 so that period 1 represents the first year of risk at or after age 50.
+Each individual's `spell` is their total years of observation.
 
 ```{r prepare-scania-individual}
 sc <- scania
@@ -234,7 +252,7 @@ cat("Individuals:", nrow(sc), "  Events:", sum(sc$event), "\n")
 ```
 
 The full dataset has over 12,000 individuals. We draw a reproducible sample
-of 500 subjects so the vignette builds in reasonable time. In practice,
+of 500 subjects so this vignette builds in reasonable time. In practice,
 fit on the full dataset.
 
 ```{r sample-scania}
@@ -243,34 +261,50 @@ ids_sample <- sample(unique(sc$id), 500L)
 sc_sample  <- sc[sc$id %in% ids_sample, ]
 ```
 
-`eha::dataLong()` expands to one row per subject per year, then we join the
-annual log rye price.
+We expand to person-period format using a base R helper, then join the annual
+food price. Each subject gets one row per year of observation. The event
+indicator is 1 only in the final row for subjects who died; all other rows
+are 0.
 
 ```{r prepare-scania-panel}
-sc_pp <- dataLong(
-  dataShort    = sc_sample,
-  timeColumn   = "spell",
-  eventColumn  = "event",
-  timeAsFactor = FALSE
-)
+# Expand individual-level data to one row per subject per period
+to_person_period <- function(data, time_col, event_col) {
+  rows <- lapply(seq_len(nrow(data)), function(i) {
+    spell <- data[[time_col]][i]
+    if (is.na(spell) || spell < 1L) return(NULL)
+    df         <- data[rep(i, spell), , drop = FALSE]
+    df$timeInt <- seq_len(spell)
+    df$y       <- c(rep(0L, spell - 1L), as.integer(data[[event_col]][i]))
+    row.names(df) <- NULL
+    df
+  })
+  do.call(rbind, rows)
+}
 
-# Rename columns and compute age / calendar year
-sc_pp$event      <- sc_pp$y
-sc_pp$exit       <- sc_pp$timeInt
-sc_pp$enter      <- sc_pp$exit - 1L
-sc_pp$age        <- sc_pp$enter + 50L
-sc_pp$year       <- sc_pp$age + floor(sc_pp$birthdate)
+sc_pp        <- to_person_period(sc_sample, time_col = "spell",
+                                 event_col = "event")
+sc_pp$event  <- sc_pp$y
+sc_pp$exit   <- sc_pp$timeInt
+sc_pp$enter  <- sc_pp$exit - 1L
+sc_pp$age    <- sc_pp$enter + 50L
 
-# Join food prices and keep relevant columns
-sc_pp <- merge(sc_pp, logrye, by = "year", all.x = TRUE)
-sc_pp <- sc_pp[, c("id", "enter", "exit", "event",
-                   "sex", "immigrant", "age", "year", "foodprices")]
+# Calendar year = birth year + age; join annual food prices
+sc_pp$year   <- sc_pp$age + floor(sc_pp$birthdate)
+sc_pp        <- merge(sc_pp, logrye, by = "year", all.x = TRUE)
+sc_pp        <- sc_pp[, c("id", "enter", "exit", "event",
+                           "sex", "immigrant", "age", "year", "foodprices")]
 
 cat("Person-period rows:", nrow(sc_pp), "\n")
 head(sc_pp)
 ```
 
 ### Fitting the Model
+
+We fit a G2G model with two time-invariant covariates (`sex`, `immigrant`)
+and the time-varying `foodprices`. The model estimates how each factor
+shifts the annual mortality hazard, while the Gamma frailty (r, alpha)
+captures unobserved heterogeneity in baseline mortality propensity across
+individuals.
 
 ```{r fit-scania}
 fit_sc <- G2G_varying_MLE(
@@ -304,26 +338,54 @@ knitr::kable(
 )
 ```
 
-The hazard ratio for `foodprices` represents the multiplicative change in
-mortality hazard for a one-unit increase in log rye price in a given year.
-A ratio above 1 indicates that higher food prices (nutritional stress)
-increase mortality risk in that period.
+### Hazard Ratios
 
-### Visualization
+Exponentiate covariate coefficients to obtain hazard ratios — the
+multiplicative change in period mortality hazard for a one-unit increase in
+each predictor.
+
+```{r hr-scania}
+coef_idx_sc <- seq_along(fit_sc$par)[-(1:2)]
+hr_sc <- data.frame(
+  Covariate   = names(fit_sc$par)[coef_idx_sc],
+  Coefficient = fit_sc$par[coef_idx_sc],
+  HR          = exp(fit_sc$par[coef_idx_sc]),
+  row.names   = NULL
+)
+knitr::kable(
+  hr_sc,
+  digits    = 3,
+  col.names = c("Covariate", "Coefficient", "Hazard Ratio"),
+  caption   = "Covariate hazard ratios -- Scania"
+)
+```
+
+A hazard ratio above 1 increases mortality risk; below 1 decreases it. The
+`foodprices` coefficient captures whether higher annual food prices — a proxy
+for nutritional scarcity — were associated with elevated mortality in that
+year, consistent with historical evidence on famine and mortality in
+19th-century Sweden.
+
+### Visualizations
+
+The baseline propensity distribution shows the Gamma-distributed heterogeneity
+in underlying mortality risk across individuals, after accounting for sex,
+immigrant status, and food prices.
 
 ```{r plot-p0-scania, fig.cap = "Gamma distribution over baseline mortality propensity (Scania)"}
 plot_p0(fit_sc)
 ```
 
-```{r plot-paper-scania, fig.cap = "Actual vs. G2G predicted survival and retention (Scania)"}
-out_sc <- plot_insample_holdout_paper(
-  fo       = Surv(exit, event) ~ sex + immigrant + foodprices,
-  data     = sc_pp,
-  subject  = "id",
-  split_at = 10L
+The in-sample survivor curve plots the mean predicted S(t) — the probability
+of surviving to each period — averaged across all subjects in the sample.
+
+```{r plot-survival-scania, fig.cap = "In-sample G2G mean survivor curve (Scania)"}
+plot_survival_insample_g2g(
+  fo         = Surv(exit, event) ~ sex + immigrant + foodprices,
+  train      = sc_pp,
+  subject    = "id",
+  model_type = "varying"
 )
-print(out_sc$p_survival)
-print(out_sc$p_retention)
 ```
 
 ---
