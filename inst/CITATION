@@ -8,7 +8,7 @@ bibentry(
   ),
   year     = "2026",
   note     = "R package version 0.1.0",
-  url      = "https://cran.r-project.org/package=G2Gcov"
+  url      = "https://CRAN.R-project.org/package=G2Gcov"
 )
 
 bibentry(
@@ -22,6 +22,5 @@ bibentry(
   year     = "1997",
   volume   = "11",
   number   = "1",
-  pages    = "61--73",
-  doi      = "10.1002/(SICI)1520-6653(199724)11:1<61::AID-DIR5>3.0.CO;2-0"
+  pages    = "61--73"
 )

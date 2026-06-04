@@ -192,7 +192,6 @@ if (anyNA(fit$par_stderr)) {
 
 Fader, P.S. and Hardie, B.G.S. (1997). How to project customer retention.
 *Journal of Interactive Marketing*, 11(1), 61--73.
-<https://doi.org/10.1002/(SICI)1520-6653(199724)11:1%3C61::AID-DIR5%3E3.0.CO;2-0>
 
 Grassia, A. (1977). On a family of distributions with argument between 0 and
 1 obtained by transformation of the Gamma distribution and derived compound

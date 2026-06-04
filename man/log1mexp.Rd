@@ -18,6 +18,6 @@ algorithm of Mächler (2012).
 }
 \references{
 Mächler, M. (2012). Accurately Computing log(1 - exp(-|a|)). 
-\url{https://cran.r-project.org/web/packages/Rmpfr/vignettes/log1mexp-note.pdf}
+\url{https://CRAN.R-project.org/package=Rmpfr}
 }
 \keyword{internal}

@@ -8,7 +8,7 @@
 #' @keywords internal
 #' @references 
 #' Mächler, M. (2012). Accurately Computing log(1 - exp(-|a|)). 
-#' \url{https://cran.r-project.org/web/packages/Rmpfr/vignettes/log1mexp-note.pdf}
+#' \url{https://CRAN.R-project.org/package=Rmpfr}
 log1mexp <- function(x) {
   ifelse(
     x > -0.6931472,
@@ -30,7 +30,7 @@ log1mexp <- function(x) {
 #' @keywords internal
 #' @references 
 #' Mächler, M. (2012). Accurately Computing log(1 - exp(-|a|)). 
-#' \url{https://cran.r-project.org/web/packages/Rmpfr/vignettes/log1mexp-note.pdf}
+#' \url{https://CRAN.R-project.org/package=Rmpfr}
 logdiffexp <- function(a, b) {
   ifelse(
     (a < Inf) & (a > b),

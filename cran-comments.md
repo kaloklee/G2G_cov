@@ -2,7 +2,19 @@
 
 ## R CMD check results
 
-0 errors | 0 warnings | 0 notes
+0 errors | 0 warnings | 1 note
+
+The single note is from the CRAN incoming feasibility check:
+
+    Possibly misspelled words in DESCRIPTION:
+      Fader (13:37)
+      Grassia (13:47)
+      Hardie's (13:47)
+
+These are not misspellings. "Grassia" is the surname of the statistician who
+introduced the Grassia(II) distribution (Grassia, 1977). "Fader" and
+"Hardie's" refer to Peter Fader and Bruce Hardie, the authors of the
+methodology this package implements.
 
 ## Platform testing
 

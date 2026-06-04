@@ -95,7 +95,7 @@ subject per time period.
 For time-invariant models, one row per subject is sufficient.
 
 A useful tutorial on constructing person-period datasets can be found at
-<https://www.rensvandeschoot.com/tutorials/discrete-time-survival/>.
+<https://github.com/Rensvandeschoot/Tutorials>.
 
 ---
 

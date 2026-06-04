@@ -253,7 +253,6 @@ period beyond week 12.
 
 Fader, P.S. and Hardie, B.G.S. (1997). How to project customer retention.
 *Journal of Interactive Marketing*, 11(1), 61--73.
-<https://doi.org/10.1002/(SICI)1520-6653(199724)11:1%3C61::AID-DIR5%3E3.0.CO;2-0>
 
 Fader, P.S. and Hardie, B.G.S. (2007). How to project customer retention
 revisited: The role of duration dependence.
